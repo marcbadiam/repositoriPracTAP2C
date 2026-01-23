@@ -23,7 +23,7 @@ class TestChatCommands(unittest.TestCase):
     
     def test_parse_simple_command(self):
         """Prova l'anàlisi d'una ordre simple."""
-        cmd = self.handler.parse_command("/agent help")
+        cmd = self.handler.parse_command("-agent help")
         
         self.assertIsNotNone(cmd)
         self.assertEqual(cmd.command, "agent help")
@@ -31,7 +31,7 @@ class TestChatCommands(unittest.TestCase):
     
     def test_parse_command_with_args(self):
         """Prova l'anàlisi d'una ordre amb arguments."""
-        cmd = self.handler.parse_command("/explorer start x=10 z=20 range=50")
+        cmd = self.handler.parse_command("-explorer start x=10 z=20 range=50")
         
         self.assertIsNotNone(cmd)
         self.assertEqual(cmd.command, "explorer start")
@@ -41,7 +41,7 @@ class TestChatCommands(unittest.TestCase):
     
     def test_parse_command_string_args(self):
         """Prova l'anàlisi d'una ordre amb arguments de text."""
-        cmd = self.handler.parse_command("/miner set strategy vertical")
+        cmd = self.handler.parse_command("-miner set strategy vertical")
         
         self.assertIsNotNone(cmd)
         # L'ordre inclou tots els tokens que no són arguments
@@ -61,14 +61,14 @@ class TestChatCommands(unittest.TestCase):
             executed.append(True)
         
         self.handler.register("test command", test_handler)
-        result = self.handler.handle_command("/test command")
+        result = self.handler.handle_command("-test command")
         
         self.assertTrue(result)
         self.assertEqual(len(executed), 1)
     
     def test_handle_unknown_command(self):
         """Prova la gestió d'ordres desconegudes."""
-        result = self.handler.handle_command("/unknown command")
+        result = self.handler.handle_command("-unknown command")
         
         self.assertFalse(result)
     

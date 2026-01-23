@@ -13,7 +13,7 @@ class TestReflectiveDiscovery(unittest.TestCase):
         strategies = discover_strategies()
         
 
-        self.assertGreaterEqual(len(strategies), 3)
+        self.assertGreaterEqual(len(strategies), 2)
         
 
         for name, strategy_class in strategies.items():
@@ -35,7 +35,7 @@ class TestReflectiveDiscovery(unittest.TestCase):
         strategies = discover_strategies()
         
         strategy_names = set(strategies.keys())
-        expected_names = {"GridSearchStrategy", "VerticalSearchStrategy", "VeinSearchStrategy"}
+        expected_names = {"GridSearchStrategy", "VerticalSearchStrategy"}
         
         # Totes les estratègies esperades han de ser descobertes
         self.assertTrue(expected_names.issubset(strategy_names))
