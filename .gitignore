@@ -1,0 +1,12 @@
+
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+*.log
+
+Server/
