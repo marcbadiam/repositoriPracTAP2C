@@ -12,6 +12,12 @@ class DummyAgent(BaseAgent):
         pass
     def act(self):
         pass
+    def pause(self):
+        self.set_state(AgentState.PAUSED)
+    def resume(self):
+        self.set_state(AgentState.RUNNING)
+    def stop(self):
+        self.set_state(AgentState.STOPPED)
 
 
 class TestChatCommands(unittest.TestCase):
@@ -77,7 +83,7 @@ class TestChatCommands(unittest.TestCase):
         agent = DummyAgent("TestAgent")
         agents = {"TestAgent": agent}
         
-        handler = create_default_handlers(agents)
+        handler = create_default_handlers(agents, None, None)
         
         # Comprova que els gestors comuns estan registrats
         self.assertIn("agent help", handler.handlers)

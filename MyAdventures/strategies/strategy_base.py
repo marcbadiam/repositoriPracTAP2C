@@ -31,7 +31,7 @@ class MiningStrategy(ABC):
         self.start_time = None
     
     @abstractmethod
-    def mine(self, mc, start_pos: Tuple[int, int, int], inventory: Dict, requirements: Optional[Dict] = None) -> Dict:
+    def mine(self, mc, start_pos: Tuple[int, int, int], inventory: Dict, requirements: Optional[Dict] = None, mc_lock=None) -> Dict:
         """
         Executar estratègia de mineria.
         
@@ -39,6 +39,7 @@ class MiningStrategy(ABC):
             mc: Instància de Minecraft
             start_pos: Posició inicial (x, y, z)
             inventory: Diccionari d'inventari actual amb requeriments
+            mc_lock: Lock per sincronitzar accés a mc (opcional)
             
         Returns:
             dict: Materials col·lectats {material: quantitat}
@@ -81,7 +82,7 @@ class MiningStrategy(ABC):
         return updated
     
     def mine_block(self, mc, position: Tuple[int, int, int], 
-                   block_type: str, inventory: Dict, requirements: Optional[Dict] = None) -> Dict:
+                   block_type: str, inventory: Dict, requirements: Optional[Dict] = None, mc_lock=None) -> Dict:
         """
         Minar un bloc única i afegir materials a l'inventari.
         
@@ -90,6 +91,7 @@ class MiningStrategy(ABC):
             position: Posició del bloc (x, y, z)
             block_type: Tipus de bloc a minar
             inventory: Inventari actual
+            mc_lock: Threading lock per sincronitzar accés al socket
             
         Returns:
             dict: Materials extrets d'aquest bloc
@@ -102,16 +104,24 @@ class MiningStrategy(ABC):
             logger.warning(f"Tipus de bloc desconegut: {block_type}")
             return {}
         
-        # Opcionalment aturar si ja tenim els requeriments per a aquest bloc
-        if requirements:
-            needed = requirements.get(block_type, 0)
-            if inventory.get(block_type, 0) >= needed:
-                return {}
 
         # Comprovar que el bloc existent coincideix amb el tipus esperat abans de minar
         if mc:
             try:
-                existing_id = mc.getBlock(position[0], position[1], position[2])
+                if mc_lock:
+                    mc_lock.acquire()
+                try:
+                    existing_id = mc.getBlock(position[0], position[1], position[2])
+                    # Debug temporal
+                    if existing_id != 0:
+                         logger.info(f"DEBUG: Trobat Block amb ID {existing_id} a {position} (Busquem: {block_type})")
+                    else:
+                         # Logejar aire "ocasionalment" per demostrar que estem escanejant
+                         if (position[0] + position[1] + position[2]) % 10 == 0:
+                             logger.info(f"DEBUG: AIRE trobat a {position}")
+                finally:
+                    if mc_lock:
+                        mc_lock.release()
             except Exception as e:
                 logger.error(f"Error obtenint bloc a {position}: {e}")
                 return {}
@@ -131,8 +141,14 @@ class MiningStrategy(ABC):
         # Intentar trencar el bloc si la instància de minecraft està disponible
         if mc:
             try:
-                mc.setBlock(position[0], position[1], position[2], 0)  # Aire
-                self.blocks_mined += 1
+                if mc_lock:
+                    mc_lock.acquire()
+                try:
+                    mc.setBlock(position[0], position[1], position[2], 0)  # Aire
+                    self.blocks_mined += 1
+                finally:
+                    if mc_lock:
+                        mc_lock.release()
             except Exception as e:
                 logger.error(f"Error minant bloc a {position}: {e}")
         

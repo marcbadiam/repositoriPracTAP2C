@@ -9,155 +9,172 @@ logger = logging.getLogger(__name__)
 
 class BuilderBot(BaseAgent):
     """Agent que construeix plataformes 4x4 amb terra i pedra."""
-    def __init__(self, name, message_bus, mc):
+    def __init__(self, name, message_bus, mc, mc_lock=None):
         super().__init__(name)
         self.message_bus = message_bus
         self.mc = mc
-        self.materials_needed = {"dirt": 8, "stone": 8}  # BOM per 4x4 (2 de terra, 2 de pedra)
-        self.materials_received = {"dirt": 0}  # Materials rebuts fins ara
-        self.target_zone = None                # Zona objectiu on construir
-        self.completed = False                 # Estat de finalització de la tasca
-        self.build_blocks = []                 # Llista de blocs a construir
-        self.build_index = 0                   # Índex del bloc actual
-        self.last_block_time = 0               # Temps de l'últim bloc col·locat
-        self.ready = False                     # Bandera de readiness
-        self.materials_received = {"dirt": 0, "stone": 0}  # Multi-material inventory
-        self.last_request_time = 0             # Per evitar spam de demandes
+        self.mc_lock = mc_lock
+        self.bom = {"dirt": 8, "stone": 8}
+        self.inventory = {"dirt": 0, "stone": 0}
+        self.target_zone = None
+        self.build_plan = []
+        self.build_index = 0
+        self.last_request_time = 0
 
-    def perceive(self):
-        """Percep l'inventari disponible via inventory.v1"""
-        self.log.debug(f"Materials disponibles: {self.materials_received}")
+        self.message_bus.subscribe(self.on_message)
+        self.set_state(AgentState.IDLE)
 
-    def decide(self):
-        """Comprova si s'han rebut tots els materials necesaris."""
-        have_materials = all(self.materials_received.get(k, 0) >= v for k, v in self.materials_needed.items())
-        # Si ja estem construint (build_blocks no buit), mantenim ready per continuar
-        if self.build_blocks:
-            self.ready = True
-        else:
-            self.ready = have_materials and self.target_zone is not None
-
-    def act(self):
-        """Executa la construcció o espera materials."""
-        if self.completed:
-            self.log.info("Construcció ja completada")
-            self.set_state(AgentState.STOPPED, reason="Construcció completada")
+    def on_message(self, msg):
+        """Gestiona missatges rebuts."""
+        # Filtrar missatges propis
+        if msg.get("source") == self.name:
             return
 
-        building_in_progress = bool(self.build_blocks)
-
-        # Si no estem llestos i tampoc hem començat a construir, demanem materials i sortim
-        if not self.ready and not building_in_progress:
-            current_time = time.time()
-            if current_time - self.last_request_time > 2.0:
-                msg = MessageProtocol.create_message(
-                    msg_type="materials.requirements.v1",
-                    source=self.name,
-                    target="MinerBot",
-                    payload={"needs": self.materials_needed, "zone": self.target_zone},
-                    context={"state": self.state.name}
-                )
-                self.message_bus.publish(msg)
-                self.log.info(f"Demanda de materials: {self.materials_needed}")
-                self.last_request_time = current_time
-            self.set_state(AgentState.WAITING, reason="Esperant materials")
+        msg_type = msg.get("type")
+        target = msg.get("target")
+        
+        # Acceptar missatges específics
+        if target and target not in ["all", self.name] and msg_type != "workflow.reset":
             return
 
-        # Temps disponible: construir
-        x, y, z = self.target_zone["x"], self.target_zone["y"], self.target_zone["z"]
+        if msg_type == "map.v1":
+            self._handle_map_v1(msg)
+        elif msg_type == "inventory.v1":
+            self._handle_inventory_v1(msg)
+        elif msg_type == "workflow.reset":
+            self.reset()
 
-        # Primera vegada: preparar llista de blocs 4x4 (2 terra, 2 pedra)
-        if not self.build_blocks:
-            mark_bot(self.mc, x, y + 2, z, wool_color=5, label=self.name)
-            platform_y = y + 1
-            
-            # Plataforma 4x4 amb patró:
-            # 2 columnes de terra (dx=0,1) + 2 columnes de pedra (dx=2,3)
-            for dx in range(4):
-                for dz in range(4):
-                    material_type = "dirt" if dx < 2 else "stone"
-                    self.build_blocks.append((x + dx, platform_y, z + dz, material_type))
-            
-            self.log.info(f"Pla de construcció 4x4 creat: {len(self.build_blocks)} blocs")
-            self.build_index = 0
-            self.last_block_time = time.time()
-            self.set_state(AgentState.RUNNING, reason="Iniciant construcció 4x4")
-            return
+    def _handle_map_v1(self, msg):
+        self.target_zone = msg.get("payload", {}).get("zone")
+        self.log.info(f"Nova zona de construcció rebuda: {self.target_zone}")
+        self.set_state(AgentState.WAITING, "Zona rebuda, esperant materials")
+        self._request_materials()
 
-        # Construir blocs amb interval
+    def _handle_inventory_v1(self, msg):
+        self.inventory = msg.get("payload", {}).get("inventory", {})
+        self.log.info(f"Inventari actualitzat: {self.inventory}")
+        self._check_readiness()
+
+    def _request_materials(self):
+        """Envia una petició de materials al MinerBot."""
         current_time = time.time()
-        if current_time - self.last_block_time < 1.0:
-            return
-
-        if self.build_index < len(self.build_blocks):
-            bx, by, bz, material_type = self.build_blocks[self.build_index]
-
-            # Verificar disponibilitat
-            if self.materials_received.get(material_type, 0) <= 0:
-                self.log.warning(f"Manca de {material_type}")
-                self.set_state(AgentState.WAITING, reason=f"Manca de {material_type}")
-                return
-
-            # Col·locar bloc
-            if material_type == "dirt":
-                block_id = getattr(mcblock, "DIRT", None)
-            else:
-                block_id = getattr(mcblock, "STONE", None)
-
-            material_id = block_id.id if block_id else (3 if material_type == "dirt" else 1)
-            self.mc.setBlock(bx, by, bz, material_id)
-            self.materials_received[material_type] -= 1
-
-            self.log.debug(f"Bloc {material_type} col·locat a ({bx},{by},{bz})")
-            self.build_index += 1
-            self.last_block_time = current_time
-        else:
-            # Construcció finalitzada
-            self.log.info(f"Plataforma 4x4 completada a ({x},{y},{z})")
-            
-            # Notificar al MinerBot
-            complete_msg = MessageProtocol.create_message(
-                msg_type="build.complete.v1",
+        if current_time - self.last_request_time > 5.0:  # Evita spam
+            msg = MessageProtocol.create_message(
+                msg_type="materials.requirements.v1",
                 source=self.name,
                 target="MinerBot",
-                payload={"zone": {"x": x, "y": y, "z": z}},
-                context={"state": self.state.name}
+                payload={"needs": self.bom}
             )
-            self.message_bus.publish(complete_msg)
+            self.message_bus.publish(msg)
+            self.log.info(f"Petició de materials enviada: {self.bom}")
+            self.last_request_time = current_time
 
-            self.completed = True
-            self.build_blocks = []
-            self.build_index = 0
-            self.set_state(AgentState.STOPPED, reason="Construcció completada")
-    def on_message(self, msg):
-        """Gestiona els missatges rebuts del bus de comunicació."""
-        if msg["type"] == "map.v1":
-            zone = msg.get("payload", {}).get("zone")
-            if zone and all(k in zone for k in ("x", "y", "z")):
-                self.target_zone = zone
-                # Reiniciar estat per a nova tasca de construcció
-                self.completed = False
-                self.build_blocks = []
-                self.build_index = 0
-                # Reiniciar inventari rebut
-                self.materials_received = {k: 0 for k in self.materials_needed}
-                self.ready = False
-                self.set_state(AgentState.IDLE, reason="Nova zona rebuda")
-                self.mc.postToChat("[BuilderBot] Zona rebuda. Usa '-builder build' per iniciar construcció.")
-                self.log.info(f"Zona rebuda: {zone}")
+    def _check_readiness(self):
+        """Comprova si té tot el necessari per començar a construir."""
+        if self.state == AgentState.WAITING and self.target_zone:
+            if all(self.inventory.get(k, 0) >= v for k, v in self.bom.items()):
+                self.log.info("Materials suficients. Iniciant construcció.")
+                self.set_state(AgentState.RUNNING, "Materials disponibles")
+            else:
+                self.log.info("Encara falten materials. Esperant...")
+                self._request_materials()
 
-        elif msg["type"] == "inventory.v1":
-            """Rebre actualitzacions d'inventari del MinerBot."""
-            payload = msg.get("payload", {})
-            inventory = payload.get("inventory", {})
-            self.materials_received = inventory.copy()
-            self.log.debug(f"Inventari actualitzat: {self.materials_received}")
-        elif msg["type"] == "materials.location.v1":
-            payload = msg.get("payload", {})
-            chest = payload.get("chest", {})
-            contents = payload.get("contents", {})
-            if all(k in chest for k in ("x", "y", "z")):
-                self.chest = chest
-                self.mc.postToChat(f"[BuilderBot] Materials disponibles. Usa '-builder build' per construir.")
-            # Actualitzar comptador de materials rebuts
-            self.materials_received["dirt"] += int(contents.get("dirt", 0))
+    def perceive(self):
+        """Percepció"""
+        pass
+
+    def decide(self):
+        """Decisió"""
+        pass
+
+    def act(self):
+        """Executa la construcció si l'estat és RUNNING."""
+        if self.state != AgentState.RUNNING:
+            return
+
+        if not self.build_plan:
+            self._create_build_plan()
+
+        if self.build_index < len(self.build_plan):
+            self._build_next_block()
+        else:
+            self._finalize_build()
+
+    def _create_build_plan(self):
+        """Crea el pla de construcció per a una plataforma 4x4."""
+        if not self.target_zone:
+            return
+        x, y, z = self.target_zone['x'], self.target_zone['y'], self.target_zone['z']
+        
+        if self.mc_lock: self.mc_lock.acquire()
+        try:
+            mark_bot(self.mc, x, y + 2, z, wool_color=5, label=self.name)
+        finally:
+            if self.mc_lock: self.mc_lock.release()
+
+        platform_y = y + 1
+        for dx in range(4):
+            for dz in range(4):
+                material = "dirt" if dx < 2 else "stone"
+                self.build_plan.append((x + dx, platform_y, z + dz, material))
+        
+        self.log.info(f"Pla de construcció creat amb {len(self.build_plan)} blocs.")
+        self.build_index = 0
+
+    def _build_next_block(self):
+        """Construeix el següent bloc del pla."""
+        bx, by, bz, material = self.build_plan[self.build_index]
+        
+        if self.inventory.get(material, 0) > 0:
+            if self.mc_lock: self.mc_lock.acquire()
+            try:
+                block_id = mcblock.DIRT.id if material == "dirt" else mcblock.STONE.id
+                self.mc.setBlock(bx, by, bz, block_id)
+            finally:
+                if self.mc_lock: self.mc_lock.release()
+
+            self.inventory[material] -= 1
+            self.log.debug(f"Bloc de {material} col·locat a ({bx},{by},{bz}). Restants: {self.inventory[material]}")
+            
+            # Publicar progrés
+            progress_msg = MessageProtocol.create_message(
+                "build.v1", self.name, "Monitor", 
+                {"progress": (self.build_index + 1) / len(self.build_plan) * 100}
+            )
+            self.message_bus.publish(progress_msg)
+            
+            self.build_index += 1
+        else:
+            self.log.warning(f"Material insuficient '{material}'. Pausant construcció.")
+            self.set_state(AgentState.WAITING, f"Falta {material}")
+            self._request_materials()
+
+    def _finalize_build(self):
+        """Finalitza el procés de construcció."""
+        self.log.info(f"Construcció completada a la zona {self.target_zone}")
+        
+        # Notificar finalització
+        complete_msg = MessageProtocol.create_message("build.complete.v1", self.name, "MinerBot", {})
+        self.message_bus.publish(complete_msg)
+        
+        self.set_state(AgentState.WAITING, "Construcció completada, esperant nova tasca")
+        # No resetejem l'estat intern aquí per si es vol inspeccionar
+
+    def reset(self):
+        """Reseteja l'estat del BuilderBot per a un nou workflow."""
+        self.log.info("Resetejant BuilderBot...")
+        self.inventory = {k: 0 for k in self.bom}
+        self.target_zone = None
+        self.build_plan = []
+        self.build_index = 0
+        self.set_state(AgentState.IDLE, "Resetejat per a nou workflow")
+
+    def start(self):
+        """Inicia el bot (en aquest cas, simplement el posa a IDLE esperant un mapa)."""
+        self.reset()
+        self.log.info("BuilderBot iniciat i esperant zona de construcció.")
+
+    def stop(self):
+        """Atura el bot."""
+        self.set_state(AgentState.STOPPED, "Aturat per comanda")
+        self.log.info("BuilderBot aturat.")

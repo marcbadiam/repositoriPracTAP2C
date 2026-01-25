@@ -2,6 +2,7 @@
 from .strategy_base import MiningStrategy
 from typing import Dict, Tuple, Optional
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ class GridSearchStrategy(MiningStrategy):
         self.grid_size = grid_size
     
     def mine(self, mc=None, start_pos: Tuple[int, int, int] = None, 
-             inventory: Dict = None, requirements: Dict = None) -> Dict:
+             inventory: Dict = None, requirements: Dict = None, mc_lock=None) -> Dict:
         """
         Executar mineria basada en graella a través d'una regió cúbica.
         
@@ -34,6 +35,7 @@ class GridSearchStrategy(MiningStrategy):
             mc: Instància de Minecraft
             start_pos: Posició inicial (x, y, z)
             inventory: Diccionari d'inventari actual amb requeriments
+            mc_lock: Lock per sincronitzar accés a mc (opcional)
             
         Returns:
             dict: Materials col·lectats {material: quantitat}
@@ -55,8 +57,18 @@ class GridSearchStrategy(MiningStrategy):
         logger.info(f"Iniciando mineria per cerca en graella a {start_pos}")
         
         start_x, start_y, start_z = start_pos
-        block_types = ["stone", "dirt", "sand"]
         
+        # Mapejar IDs a tipus per a consultar rapidament
+        from mcpi import block as mcblock
+        id_to_type = {
+            mcblock.STONE.id: "stone",
+            mcblock.DIRT.id: "dirt",
+            mcblock.GRASS.id: "dirt",
+            mcblock.SAND.id: "sand"
+        }
+        
+        check_counter = 0
+
         # Iterar a través dels punts de la graella
         for x_offset in range(0, self.grid_size, self.grid_spacing):
             if self.is_stopped:
@@ -68,6 +80,7 @@ class GridSearchStrategy(MiningStrategy):
                 if self.is_stopped:
                     break
                 
+                # Escaneig de baix a dalt: -3, -2, -1, 0, 1, 2, 3
                 for y_offset in range(-(self.grid_size - 1), self.grid_size, self.grid_spacing):
                     if self.is_stopped:
                         break
@@ -79,20 +92,68 @@ class GridSearchStrategy(MiningStrategy):
                     )
                     self.current_position = current_pos
                     
-                    # Minar cada tipus de bloc en aquesta posició
-                    for block_type in block_types:
-                        # Evita minar si ja hem cobert el requisit per a aquest material
-                        if requirements:
-                            remaining = requirements.get(block_type, 0) - working_inventory.get(block_type, 0)
-                            if remaining <= 0:
-                                continue
+                    # Agafar ID de block una vegada per pos
+                    existing_id = 0
+                    if mc:
+                        if mc_lock: mc_lock.acquire()
+                        try:
+                            existing_id = mc.getBlock(current_pos[0], current_pos[1], current_pos[2])
+                        finally:
+                            if mc_lock: mc_lock.release()
 
-                        materials = self.mine_block(mc, current_pos, block_type, working_inventory, requirements)
-                        collected_materials = self._merge_materials(collected_materials, materials)
-                        working_inventory = self.update_inventory(working_inventory, materials)
+                    # Comprovar salt d'aire
+                    # Si trobem aire per sobre del nivell inicial dels peus, assumim cel obert i deixem d'escanejar aquesta columna cap amunt
+                    if existing_id == 0:
+                        if y_offset >= 0:
+                            logger.debug(f"Aire tobat a {current_pos} (Level {y_offset}). Saltant a la següent columna")
+                            break # Saltar les Y superiors en aquesta columna
+                        else:
+                            # Aire trobat sota (cova?), continuar escanejant cap amunt
+                            pass
+                    
+                    # Minar si block coincideix amb requeriments
+                    block_type = id_to_type.get(existing_id)
+                    
+                    if block_type:
+                        
+                        # Executar mineria (destruir bloc)
+                        
+                        materials_yield = self.BLOCK_YIELDS.get(block_type, {}).copy()
+                        
+                        if mc:
+                            try:
+                                if mc_lock: mc_lock.acquire()
+                                try:
+                                    mc.setBlock(current_pos[0], current_pos[1], current_pos[2], 0) # Aire
+                                    self.blocks_mined += 1
+                                    logger.info(f"Minat {block_type} a {current_pos}")
+                                finally:
+                                    if mc_lock: mc_lock.release()
+                            except Exception as e:
+                                logger.error(f"Error posant block {current_pos}: {e}")
+                                continue
+                        
+                        # Filtrar materials: només afegim a l'inventari el que REALMENT necessitem
+                        useful_materials = {}
+                        if requirements:
+                            for mat, qty in materials_yield.items():
+                                needed = requirements.get(mat, 0)
+                                current = working_inventory.get(mat, 0)
+                                if current < needed:
+                                    useful_materials[mat] = qty
+                        else:
+                            useful_materials = materials_yield # Si no hi ha requirements, ho guardem tot (o res? assumim mode requirements)
+
+                        collected_materials = self._merge_materials(collected_materials, useful_materials)
+                        working_inventory = self.update_inventory(working_inventory, useful_materials)
+
                     
                     self.materials_collected = collected_materials.copy()
-                    logger.debug(f"Punt de graella {current_pos}: total col·lectat {collected_materials}")
+                    
+                    # Sleep optimitzat: cedir el control cada 10 comprovacions en lloc de cada 1
+                    check_counter += 1
+                    if check_counter % 10 == 0:
+                        time.sleep(0.01)
 
                     if requirements and self.validate_requirements(working_inventory, requirements):
                         logger.info("Requeriments assolits, aturant cerca en graella")

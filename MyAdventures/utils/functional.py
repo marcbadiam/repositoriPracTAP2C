@@ -58,7 +58,7 @@ def find_flat_zones(terrain_data: List[Dict], max_variance: float = 2.0) -> List
         if 'variance' in zone:
             return zone['variance'] <= max_variance
         if 'elevation' in zone:
-            return True  # Single point is flat by definition
+            return True 
         return False
     
     return list(filter(is_flat, terrain_data))

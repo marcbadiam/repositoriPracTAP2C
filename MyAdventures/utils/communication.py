@@ -33,17 +33,22 @@ class MessageProtocol:
 
 class MessageBus:
     def __init__(self):
-        self.subscribers = {}
+        self.subscribers = []
         self.log = logging.getLogger("MessageBus")
 
-    def subscribe(self, agent_name: str, callback):
-        self.subscribers[agent_name] = callback
-        self.log.debug(f"{agent_name} subscrit al MessageBus")
+    def subscribe(self, callback):
+        if callback not in self.subscribers:
+            self.subscribers.append(callback)
+            self.log.debug(f"Subscriptor afegit al MessageBus")
 
     def publish(self, msg: dict):
-        target = msg.get("target")
-        if target in self.subscribers:
-            self.log.debug(f"Entregant missatge a {target}: {msg['type']}")
-            self.subscribers[target](msg)
-        else:
-            self.log.warning(f"Cap subscriptor per a: {target}")
+        # Broadcast a tots els subscriptors
+        msg_type = msg.get("type", "unknown")
+        target = msg.get("target", "all")
+        self.log.debug(f"Broadcasting missatge {msg_type} (target: {target})")
+        
+        for callback in self.subscribers:
+            try:
+                callback(msg)
+            except Exception as e:
+                self.log.error(f"Error enviant missatge a subscriptor: {e}")

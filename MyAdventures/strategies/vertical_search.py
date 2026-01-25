@@ -28,7 +28,7 @@ class VerticalSearchStrategy(MiningStrategy):
         self.current_depth = None
     
     def mine(self, mc=None, start_pos: Tuple[int, int, int] = None, 
-             inventory: Dict = None, requirements: Dict = None) -> Dict:
+             inventory: Dict = None, requirements: Dict = None, mc_lock=None) -> Dict:
         """
         Executar mineria de perforació vertical cap avall a través de capes.
         
@@ -77,15 +77,23 @@ class VerticalSearchStrategy(MiningStrategy):
             for block_type in block_types:
                 if self.is_stopped:
                     break
-                
-                if requirements:
-                    remaining = requirements.get(block_type, 0) - working_inventory.get(block_type, 0)
-                    if remaining <= 0:
-                        continue
 
-                materials = self.mine_block(mc, self.current_position, block_type, working_inventory, requirements)
-                collected_materials = self._merge_materials(collected_materials, materials)
-                working_inventory = self.update_inventory(working_inventory, materials)
+
+                materials = self.mine_block(mc, self.current_position, block_type, working_inventory, requirements, mc_lock)
+                
+                # Filtrar materials útils
+                useful_materials = {}
+                if requirements:
+                    for mat, qty in materials.items():
+                        needed = requirements.get(mat, 0)
+                        current = working_inventory.get(mat, 0)
+                        if current < needed:
+                            useful_materials[mat] = qty
+                else:
+                     useful_materials = materials
+
+                collected_materials = self._merge_materials(collected_materials, useful_materials)
+                working_inventory = self.update_inventory(working_inventory, useful_materials)
             
             self.materials_collected = collected_materials.copy()
             logger.debug(f"Profunditat {current_y}: col·lectat {collected_materials}")

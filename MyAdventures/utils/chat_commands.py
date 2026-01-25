@@ -1,5 +1,4 @@
 import logging
-import re
 from typing import Callable, Dict, Any
 from agents.base_agent import AgentState
 
@@ -94,18 +93,34 @@ class ChatCommandHandler:
         return False
 
 
-def create_default_handlers(agents_dict, mc):
-    """Crea els gestors de comandes per defecte."""
+def create_default_handlers(agents_dict, mc, mc_lock=None):
+    """Crea els gestors de comandes per defecte.
+    
+    Args:
+        agents_dict: Diccionari d'agents
+        mc: Instància de Minecraft
+        mc_lock: Lock per sincronitzar accés al socket de Minecraft
+    """
     handler = ChatCommandHandler()
+
+    def _safe_post(message: str):
+        """Envia missatges al xat de forma segura amb lock opcional."""
+        if mc_lock:
+            mc_lock.acquire()
+        try:
+            mc.postToChat(message)
+        finally:
+            if mc_lock:
+                mc_lock.release()
     
     # Comanda help
     def help_command(args):
-        mc.postToChat("=== COMANDES DISPONIBLES ===")
-        mc.postToChat("-workflow run              Executa flux complet")
-        mc.postToChat("-explorer start            Inicia exploració")
-        mc.postToChat("-builder build             Construeix plataforma")
-        mc.postToChat("-miner start               Inicia mineria")
-        mc.postToChat("-agent status              Mostra estat agents")
+        _safe_post("=== COMANDES DISPONIBLES ===")
+        _safe_post("-workflow run              Executa flux complet")
+        _safe_post("-explorer start            Inicia exploració")
+        _safe_post("-builder build             Construeix plataforma")
+        _safe_post("-miner start               Inicia mineria")
+        _safe_post("-agent status              Mostra estat agents")
     
     handler.register('agent help', help_command)
     handler.register('help', help_command)
@@ -113,7 +128,7 @@ def create_default_handlers(agents_dict, mc):
     # Comanda status
     def status_command(args):
         for name, agent in agents_dict.items():
-            mc.postToChat(f"{name}: {agent.state.name}")
+            _safe_post(f"{name}: {agent.state.name}")
     
     handler.register('agent status', status_command)
     
@@ -123,12 +138,9 @@ def create_default_handlers(agents_dict, mc):
         if explorer:
             explorer.map_sent = False
             explorer.set_state(AgentState.RUNNING, reason="User command")
-            explorer.perceive()
-            explorer.decide()
-            explorer.act()
-            mc.postToChat("[ExplorerBot] Exploració iniciada")
+            _safe_post("[ExplorerBot] Exploració iniciada")
         else:
-            mc.postToChat("ExplorerBot no encontrat")
+            _safe_post("ExplorerBot no trobat")
     
     handler.register('explorer start', explorer_start)
     
@@ -137,10 +149,9 @@ def create_default_handlers(agents_dict, mc):
         builder = agents_dict.get("BuilderBot")
         if builder and builder.target_zone:
             builder.set_state(AgentState.RUNNING, reason="User command")
-            builder.tick()
-            mc.postToChat("[BuilderBot] Construcció iniciada")
+            _safe_post("[BuilderBot] Construcció iniciada")
         else:
-            mc.postToChat("[BuilderBot] Error: Executa -explorer start primer")
+            _safe_post("[BuilderBot] Error: Executa -explorer start primer")
     
     handler.register('builder build', builder_build)
     
@@ -148,10 +159,10 @@ def create_default_handlers(agents_dict, mc):
     def miner_start(args):
         miner = agents_dict.get("MinerBot")
         if miner:
-            miner.start_mining()
-            mc.postToChat("[MinerBot] Mineria iniciada")
+            miner.start()
+            _safe_post("[MinerBot] Mineria iniciada")
         else:
-            mc.postToChat("MinerBot no encontrat")
+            _safe_post("MinerBot no trobat")
     
     handler.register('miner start', miner_start)
     
@@ -159,44 +170,45 @@ def create_default_handlers(agents_dict, mc):
     def workflow_run(args):
         """Executa el flux complet: Explorer -> Builder -> Miner -> Build"""
         explorer = agents_dict.get("ExplorerBot")
-        builder = agents_dict.get("BuilderBot")
-        miner = agents_dict.get("MinerBot")
         
-        if not (explorer and builder and miner):
-            mc.postToChat("[Workflow] Error: Agents no encontrats")
+        if not explorer:
+            _safe_post("[Workflow] Error: ExplorerBot no trobat")
             return
         
-        mc.postToChat("")
-        mc.postToChat("=" * 40)
-        mc.postToChat("[Workflow] INICIANT FLUX COMPLET")
-        mc.postToChat("=" * 40)
+        _safe_post("")
+        _safe_post("=" * 40)
+        _safe_post("[Workflow] INICIANT FLUX COMPLET")
+        _safe_post("=" * 40)
         
-        # Stage 1: Explorer
-        mc.postToChat("[1/4] EXPLORER - Analitzant terreny...")
-        explorer.map_sent = False
-        explorer.set_state(AgentState.RUNNING, reason="Workflow")
-        explorer.perceive()
-        explorer.decide()
-        explorer.act()
+        # Global Reset
+        _safe_post("Resetejant estat del sistema...")
+        # Enviar missatge de reset per assegurar neteja estats interns
+        if explorer and hasattr(explorer, "message_bus"):
+             from utils.communication import MessageProtocol
+             rst_msg = MessageProtocol.create_message("workflow.reset", "User", "all", {})
+             explorer.message_bus.publish(rst_msg)
         
-        # Stage 2: Builder rebut mapa i crea BOM
-        mc.postToChat("[2/4] BUILDER - Rebent mapa i creant BOM...")
-        builder.tick()
+        # Cridar explícitament reset en tots els agents per estar segurs
+        for name, agent in agents_dict.items():
+             if hasattr(agent, 'reset'):
+                 agent.reset()
         
-        # Stage 3: Miner rebut requeriments i comença mineria
-        mc.postToChat("[3/4] MINER - Rebent requeriments i iniciant mineria...")
-        if miner.requirements:
-            miner.start_mining()
-        else:
-            mc.postToChat("[Workflow] Estableciendo requerimientos manualmente...")
-            miner.requirements = builder.materials_needed.copy()
-            miner.start_mining()
-        
-        # Stage 4: Builder construeix quan té materials
-        mc.postToChat("[4/4] BUILDER - Iniciant construcció...")
-        mc.postToChat("")
-        mc.postToChat("Sistema executant workflow...")
-        mc.postToChat("Espera a que es complete la construcció")
+        # Validar que tots els agents estan llestos/running (Wait a bit for resets?)
+        import time
+        time.sleep(0.5)
+
+        for name, agent in agents_dict.items():
+             # Assegurar sempre que el thread s'està executant independentment de l'estat
+             if not agent._thread or not agent._thread.is_alive():
+                 logger.info(f"Reiniciant fil d'execució per a {name}")
+                 agent.start_loop()
+             
+             if agent.state == AgentState.STOPPED:
+                 agent.set_state(AgentState.IDLE, reason="Workflow restart")
+
+        # Iniciar Explorer (que iniciarà la cadena)
+        _safe_post("Iniciant ExplorerBot per començar la cadena...")
+        explorer.handle_command('start', {})
     
     handler.register('workflow run', workflow_run)
     
@@ -207,19 +219,19 @@ def create_default_handlers(agents_dict, mc):
         def make_pause_handler(a, agent_name):
             def pause_cmd(args):
                 a.handle_command('pause', args)
-                mc.postToChat(f"[{agent_name}] Pausat")
+                _safe_post(f"[{agent_name}] Pausat")
             return pause_cmd
         
         def make_resume_handler(a, agent_name):
             def resume_cmd(args):
                 a.handle_command('resume', args)
-                mc.postToChat(f"[{agent_name}] Repres")
+                _safe_post(f"[{agent_name}] Repres")
             return resume_cmd
         
         def make_stop_handler(a, agent_name):
             def stop_cmd(args):
                 a.handle_command('stop', args)
-                mc.postToChat(f"[{agent_name}] Aturat")
+                _safe_post(f"[{agent_name}] Aturat")
             return stop_cmd
         
         handler.register(f'{agent_prefix} pause', make_pause_handler(agent, name))
