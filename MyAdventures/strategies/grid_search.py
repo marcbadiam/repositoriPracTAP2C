@@ -48,6 +48,11 @@ class GridSearchStrategy(MiningStrategy):
         collected_materials = {}
         working_inventory = inventory.copy()
         self.materials_collected = {}
+
+        # Comprovar si ja tenim els requeriments
+        if requirements and self.validate_requirements(working_inventory, requirements):
+             logger.info("Requeriments ja assolits.")
+             return collected_materials
         
         if start_pos is None:
             logger.warning("Cap posició inicial proporcionada per a cerca en graella")

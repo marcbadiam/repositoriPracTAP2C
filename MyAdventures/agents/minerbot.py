@@ -1,7 +1,6 @@
 from .base_agent import BaseAgent, AgentState
 from utils.communication import MessageProtocol
-from strategies.grid_search import GridSearchStrategy
-from strategies.vertical_search import VerticalSearchStrategy
+from utils.discovery import discover_strategies
 from utils.visuals import mark_bot
 from mcpi import block as mcblock
 import logging
@@ -15,13 +14,50 @@ class MinerBot(BaseAgent):
         self.message_bus = message_bus
         self.mc = mc
         self.mc_lock = mc_lock
-        self.strategies = [GridSearchStrategy(grid_spacing=1, grid_size=4), VerticalSearchStrategy()]
+        
+        # Carrega les estratègies dinàmicament
+        self.strategies = []
+        self._load_strategies()
+        self.current_strategy_index = 0
+        
         self.inventory = {"dirt": 0, "stone": 0}
         self.requirements = None
         self.anchor_pos = None
 
         self.message_bus.subscribe(self.on_message)
         self.set_state(AgentState.IDLE)
+
+    def _load_strategies(self):
+        """Carrega les estratègies dinàmicament ."""
+        strategy_classes = discover_strategies()
+        # Ordenem les estratègies
+        sorted_names = sorted(strategy_classes.keys())
+        
+        for name in sorted_names:
+            cls = strategy_classes[name]
+            # Si es GridSearchStrategy necessitem pasarli els paràmetres addicionals
+            if name == "GridSearchStrategy":
+                instance = cls(grid_spacing=1, grid_size=4)
+            else:
+                instance = cls()
+            self.strategies.append(instance)
+            self.log.info(f"Estratègia carregada: {name}")
+
+    def set_strategy(self, index: int):
+        """S'estableix l'estratègia segons l'índex."""
+        if 0 <= index < len(self.strategies):
+            self.current_strategy_index = index
+            strategy_name = self.strategies[index].__class__.__name__
+            self.log.info(f"Estratègia canviada a l'índex {index}: {strategy_name}")
+            return True, strategy_name
+        else:
+            self.log.warning(f"Índex d'estratègia invàlid.")
+            return False, None
+
+    def cycle_strategy(self):
+        """Ciclem a la següent estratègia."""
+        next_index = (self.current_strategy_index + 1) % len(self.strategies)
+        return self.set_strategy(next_index)
 
     def on_message(self, msg):
         """Gestiona missatges rebuts."""
@@ -100,7 +136,11 @@ class MinerBot(BaseAgent):
 
     def _mine_resources(self):
         """Executa una passada de mineria amb una estratègia."""
-        strategy = self.strategies[0]  # GridSearch
+        if not self.strategies:
+            self.log.error("No hi ha estratègies carregades.")
+            return
+
+        strategy = self.strategies[self.current_strategy_index]
         
         # Capturar inventari abans de minar per detectar progrés
         before_inventory = self.inventory.copy()
@@ -117,8 +157,13 @@ class MinerBot(BaseAgent):
                 self.log.info(f"Recol·lectat: {collected}. Inventari actual: {self.inventory}")
                 self._publish_inventory()
         
-        # Si no s'ha fet progrés, o s'ha acabat la passada pero encara falten coses -> Baixar
+             # Si s'ha acabat la passada pero encara falten coses -> Baixar
         if not self._check_requirements_fulfilled():
+             # Per si anchor deixa de ser valid
+             if self.anchor_pos is None:
+                 self.log.warning("Ultima posicio d'ancoratge perduda, race condition, abortant.")
+                 return
+
              # Moure anchor cap baix
              self.log.info("Passada de mineria completada sense cobrir requeriments. Baixant nivell de mineria...")
              # Baixar segons la mida del strategy grid  - 4 de moment !!
@@ -154,6 +199,8 @@ class MinerBot(BaseAgent):
     def stop(self):
         """Atura la mineria."""
         self.set_state(AgentState.STOPPED, "Aturat per comanda")
+        if self.strategies and 0 <= self.current_strategy_index < len(self.strategies):
+            self.strategies[self.current_strategy_index].handle_stop()
         self.log.info("Mineria aturada.")
         
     def reset(self):

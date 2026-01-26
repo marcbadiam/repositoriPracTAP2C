@@ -166,6 +166,18 @@ def create_default_handlers(agents_dict, mc, mc_lock=None):
     
     handler.register('miner start', miner_start)
     
+    def miner_switch(args):
+        miner = agents_dict.get("MinerBot")
+        if not miner:
+            _safe_post("MinerBot no trobat")
+            return
+            
+        success, name = miner.cycle_strategy()
+        _safe_post(f"[MinerBot] Estratègia canviada a: {name}")
+
+
+    handler.register('miner switch', miner_switch)
+    
     # Workflow command - MAIN ENTRY POINT
     def workflow_run(args):
         """Executa el flux complet: Explorer -> Builder -> Miner -> Build"""
