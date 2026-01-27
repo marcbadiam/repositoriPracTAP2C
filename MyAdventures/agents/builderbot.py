@@ -14,8 +14,19 @@ class BuilderBot(BaseAgent):
         self.message_bus = message_bus
         self.mc = mc
         self.mc_lock = mc_lock
-        self.bom = {"dirt": 8, "stone": 8}
-        self.inventory = {"dirt": 0, "stone": 0}
+        self.plans = {
+            "plataforma": {
+                "bom": {"dirt": 8, "stone": 8},
+                "generator": self._generate_plataforma_plan
+            },
+            "castell": {
+                "bom": {"sandstone": 25, "stone": 45},
+                "generator": self._generate_castell_plan
+            }
+        }
+        self.current_plan_name = "plataforma"
+        self.bom = self.plans[self.current_plan_name]["bom"]
+        self.inventory = {"dirt": 0, "stone": 0, "sandstone": 0}
         self.target_zone = None
         self.build_plan = []
         self.build_index = 0
@@ -23,6 +34,35 @@ class BuilderBot(BaseAgent):
 
         self.message_bus.subscribe(self.on_message)
         self.set_state(AgentState.IDLE)
+
+    def switch_plan(self, plan_name):
+        """Canvia el pla de construcció actiu."""
+        if plan_name not in self.plans:
+            self.log.error(f"Pla desconegut: {plan_name}")
+            return False
+        
+        self.current_plan_name = plan_name
+        self.bom = self.plans[plan_name]["bom"]
+       
+        for mat in self.bom:
+            if mat not in self.inventory:
+                self.inventory[mat] = 0
+                
+        self.log.info(f"Pla canviat a '{plan_name}'. Nous requisits: {self.bom}")
+        return True
+
+    def cycle_plan(self):
+        """Rota al següent pla disponible."""
+        plan_names = list(self.plans.keys())
+        try:
+            current_index = plan_names.index(self.current_plan_name)
+            next_index = (current_index + 1) % len(plan_names)
+        except ValueError:
+            next_index = 0
+            
+        next_plan = plan_names[next_index]
+        self.switch_plan(next_plan)
+        return next_plan, self.plans[next_plan]["bom"]
 
     def on_message(self, msg):
         """Gestiona missatges rebuts."""
@@ -52,7 +92,9 @@ class BuilderBot(BaseAgent):
 
     def _handle_inventory_v1(self, msg):
         received_inventory = msg.get("payload", {}).get("inventory", {})
-        self.inventory = received_inventory.copy()
+        
+        for k, v in received_inventory.items():
+            self.inventory[k] = v
         self.log.info(f"Inventari actualitzat: {self.inventory}")
         self._check_readiness()
 
@@ -102,25 +144,70 @@ class BuilderBot(BaseAgent):
             self._finalize_build()
 
     def _create_build_plan(self):
-        """Crea el pla de construcció per a una plataforma 4x4."""
+        """Crea el pla de construcció basat en el pla seleccionat."""
         if not self.target_zone:
             return
+        
         x, y, z = self.target_zone['x'], self.target_zone['y'], self.target_zone['z']
         
         if self.mc_lock: self.mc_lock.acquire()
         try:
-            mark_bot(self.mc, x, y + 2, z, wool_color=5, label=self.name)
+            mark_bot(self.mc, x, y + 5, z, wool_color=5, label=self.name)
         finally:
             if self.mc_lock: self.mc_lock.release()
 
+        
+        generator = self.plans[self.current_plan_name]["generator"]
+        self.build_plan = generator(x, y, z)
+        
+        self.log.info(f"Pla de construcció '{self.current_plan_name}' creat amb {len(self.build_plan)} blocs.")
+        self.build_index = 0
+
+    def _generate_plataforma_plan(self, x, y, z):
+        """Genera el pla clàssic 4x4 (plataforma)."""
+        plan = []
         platform_y = y + 1
         for dx in range(4):
             for dz in range(4):
                 material = "dirt" if dx < 2 else "stone"
-                self.build_plan.append((x + dx, platform_y, z + dz, material))
+                plan.append((x + dx, platform_y, z + dz, material))
+        return plan
+
+    def _generate_castell_plan(self, x, y, z):
+        """Genera el pla 'castell'
+        Base 5x5 sandstone.
+        Murs stone alternant 2 i 3 d'alçada .
+        """
+        plan = []
+        base_y = y + 1
         
-        self.log.info(f"Pla de construcció creat amb {len(self.build_plan)} blocs.")
-        self.build_index = 0
+        # 1- Base 5x5 Sandstone
+        for dx in range(5):
+            for dz in range(5):
+                plan.append((x + dx, base_y, z + dz, "sandstone"))
+                
+        # 2- Murs: Stone
+        # Altures: 
+        # Capa 1 (base_y + 1): Tot el perímetre
+        # Capa 2 (base_y + 2): Tot el perímetre
+        # Capa 3 (base_y + 3): Alternant
+        
+        wall_heights = 3
+        
+        for h in range(1, wall_heights + 1):
+            current_y = base_y + h
+            for dx in range(5):
+                for dz in range(5):
+                    is_border = (dx == 0 or dx == 4 or dz == 0 or dz == 4)
+                    
+                    if is_border:
+                        if h == 3:
+                            if (dx + dz) % 2 == 0:
+                                plan.append((x + dx, current_y, z + dz, "stone"))
+                        else:
+                            plan.append((x + dx, current_y, z + dz, "stone"))
+                            
+        return plan
 
     def _build_next_block(self):
         """Construeix el següent bloc del pla."""
@@ -129,7 +216,12 @@ class BuilderBot(BaseAgent):
         if self.inventory.get(material, 0) > 0:
             if self.mc_lock: self.mc_lock.acquire()
             try:
-                block_id = mcblock.DIRT.id if material == "dirt" else mcblock.STONE.id
+                block_id = mcblock.DIRT.id
+                if material == "stone":
+                    block_id = mcblock.STONE.id
+                elif material == "sandstone":
+                    block_id = mcblock.SANDSTONE.id
+                    
                 self.mc.setBlock(bx, by, bz, block_id)
             finally:
                 if self.mc_lock: self.mc_lock.release()
@@ -164,6 +256,7 @@ class BuilderBot(BaseAgent):
     def reset(self):
         """Reseteja l'estat del BuilderBot per a un nou workflow."""
         self.log.info("Resetejant BuilderBot...")
+        self.bom = self.plans[self.current_plan_name]["bom"]
         self.inventory = {k: 0 for k in self.bom}
         self.target_zone = None
         self.build_plan = []

@@ -80,6 +80,7 @@ class GridSearchStrategy(MiningStrategy):
             mcblock.REDSTONE_ORE.id: "redstone_ore",
             mcblock.LAPIS_LAZULI_ORE.id: "lapis_ore",
             mcblock.COBBLESTONE.id: "cobblestone",
+            mcblock.SANDSTONE.id: "sandstone",
         }
         
         check_counter = 0

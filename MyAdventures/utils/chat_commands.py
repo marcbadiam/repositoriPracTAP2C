@@ -154,6 +154,20 @@ def create_default_handlers(agents_dict, mc, mc_lock=None):
             _safe_post("[BuilderBot] Error: Executa -explorer start primer")
     
     handler.register('builder build', builder_build)
+
+    # Builder switch plan
+    def builder_switch(args):
+        builder = agents_dict.get("BuilderBot")
+        if not builder:
+            _safe_post("BuilderBot no trobat")
+            return
+            
+        # Rotar plan
+        new_plan, bom = builder.cycle_plan()
+        _safe_post(f"[BuilderBot] Pla canviat a: {new_plan}")
+        _safe_post(f"Nous requisits: {bom}")
+
+    handler.register('builder switchplan', builder_switch)
     
     # Miner commands
     def miner_start(args):

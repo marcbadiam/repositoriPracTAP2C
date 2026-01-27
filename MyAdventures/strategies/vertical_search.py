@@ -60,7 +60,7 @@ class VerticalSearchStrategy(MiningStrategy):
         
         # Perforar cap avall des de la posició inicial
         current_y = start_y
-        block_types = ["stone", "dirt", "sand"]
+        block_types = ["stone", "dirt", "sand", "sandstone"]
         
         while current_y >= self.min_depth:
             if self.is_stopped:
