@@ -168,6 +168,14 @@ class MiningStrategy(ABC):
         """Aturar operacions de mineria."""
         self.is_stopped = True
         logger.info(f"Mineria de {self.get_name()} aturat")
+
+    def reset(self) -> None:
+        """Resetejar estat de l'estratègia."""
+        self.is_paused = False
+        self.is_stopped = False
+        self.blocks_mined = 0
+        self.materials_collected = {}
+        logger.info(f"Estratègia {self.get_name()} resetejada")
     
     def get_name(self) -> str:
         """Retorna el nom de l'estratègia."""

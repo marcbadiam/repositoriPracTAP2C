@@ -170,7 +170,10 @@ class MinerBot(BaseAgent):
              descent_step = getattr(strategy, 'grid_size', 4)
              new_y = self.anchor_pos[1] - descent_step
              
-
+             if new_y <= 6:
+                self.log.warning("S'ha arribat al límit de profunditat (Y=6) sense trobar els materials requerits. Abandonant mineria.")
+                self.stop()
+                return
 
              self.anchor_pos = (self.anchor_pos[0], new_y, self.anchor_pos[2])
              self.log.info(f"Nova posició d'ancoratge: {self.anchor_pos}")
@@ -178,7 +181,7 @@ class MinerBot(BaseAgent):
 
     def _publish_inventory(self, final=False):
         """Publica l'estat actual de l'inventari."""
-        payload = {"inventory": self.inventory}
+        payload = {"inventory": self.inventory.copy()}
         if final:
             # En el missatge final, enviem només el que es necessita
             payload["inventory"] = {k: min(self.inventory.get(k, 0), v) for k, v in self.requirements.items()}
@@ -209,4 +212,10 @@ class MinerBot(BaseAgent):
         self.inventory = {}
         self.requirements = None
         self.anchor_pos = None
+        
+        # Reset strategies
+        if self.strategies:
+            for strategy in self.strategies:
+                strategy.reset()
+                
         self.set_state(AgentState.IDLE, "Resetejat per a nou workflow")

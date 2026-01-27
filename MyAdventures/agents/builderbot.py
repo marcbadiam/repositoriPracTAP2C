@@ -51,7 +51,8 @@ class BuilderBot(BaseAgent):
         self._request_materials()
 
     def _handle_inventory_v1(self, msg):
-        self.inventory = msg.get("payload", {}).get("inventory", {})
+        received_inventory = msg.get("payload", {}).get("inventory", {})
+        self.inventory = received_inventory.copy()
         self.log.info(f"Inventari actualitzat: {self.inventory}")
         self._check_readiness()
 

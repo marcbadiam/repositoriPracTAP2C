@@ -69,7 +69,17 @@ class GridSearchStrategy(MiningStrategy):
             mcblock.STONE.id: "stone",
             mcblock.DIRT.id: "dirt",
             mcblock.GRASS.id: "dirt",
-            mcblock.SAND.id: "sand"
+            mcblock.SAND.id: "sand",
+            mcblock.GRAVEL.id: "gravel",
+            mcblock.WOOD.id: "wood",
+            mcblock.WOOD_PLANKS.id: "wood_planks",
+            mcblock.COAL_ORE.id: "coal_ore",
+            mcblock.IRON_ORE.id: "iron_ore",
+            mcblock.GOLD_ORE.id: "gold_ore",
+            mcblock.DIAMOND_ORE.id: "diamond_ore",
+            mcblock.REDSTONE_ORE.id: "redstone_ore",
+            mcblock.LAPIS_LAZULI_ORE.id: "lapis_ore",
+            mcblock.COBBLESTONE.id: "cobblestone",
         }
         
         check_counter = 0
@@ -90,6 +100,10 @@ class GridSearchStrategy(MiningStrategy):
                     if self.is_stopped:
                         break
                     
+                    if requirements and self.validate_requirements(working_inventory, requirements):
+                        logger.info("Requeriments assolits, aturant cerca en graella")
+                        return collected_materials
+                    
                     current_pos = (
                         start_x + x_offset,
                         start_y + y_offset,
@@ -97,7 +111,7 @@ class GridSearchStrategy(MiningStrategy):
                     )
                     self.current_position = current_pos
                     
-                    # Agafar ID de block una vegada per pos
+                    # Agafar ID de block
                     existing_id = 0
                     if mc:
                         if mc_lock: mc_lock.acquire()
@@ -106,37 +120,31 @@ class GridSearchStrategy(MiningStrategy):
                         finally:
                             if mc_lock: mc_lock.release()
 
-                    # Comprovar salt d'aire
-                    # Si trobem aire per sobre del nivell inicial dels peus, assumim cel obert i deixem d'escanejar aquesta columna cap amunt
-                    if existing_id == 0:
-                        if y_offset >= 0:
-                            logger.debug(f"Aire tobat a {current_pos} (Level {y_offset}). Saltant a la següent columna")
-                            break # Saltar les Y superiors en aquesta columna
-                        else:
-                            # Aire trobat sota (cova?), continuar escanejant cap amunt
-                            pass
+                    if existing_id == 0 or existing_id == 7: # 7 es Bedrock
+                        continue
                     
-                    # Minar si block coincideix amb requeriments
                     block_type = id_to_type.get(existing_id)
                     
-                    if block_type:
-                        
-                        # Executar mineria (destruir bloc)
-                        
-                        materials_yield = self.BLOCK_YIELDS.get(block_type, {}).copy()
-                        
-                        if mc:
+                    # minem
+                    success = False
+                    if mc:
+                        try:
+                            if mc_lock: mc_lock.acquire()
                             try:
-                                if mc_lock: mc_lock.acquire()
-                                try:
-                                    mc.setBlock(current_pos[0], current_pos[1], current_pos[2], 0) # Aire
-                                    self.blocks_mined += 1
-                                    logger.info(f"Minat {block_type} a {current_pos}")
-                                finally:
-                                    if mc_lock: mc_lock.release()
-                            except Exception as e:
-                                logger.error(f"Error posant block {current_pos}: {e}")
-                                continue
+                                mc.setBlock(current_pos[0], current_pos[1], current_pos[2], 0) # Posar Aire
+                                self.blocks_mined += 1
+                                success = True
+                                
+                                logger.debug(f"Netejat bloc ID {existing_id} a {current_pos}")
+                            finally:
+                                if mc_lock: mc_lock.release()
+                        except Exception as e:
+                            logger.error(f"Error posant aire {current_pos}: {e}")
+                            continue
+
+                    # Si hem minat amb exit i es un bloc dels requisits l'afegim a l'inventari
+                    if success and block_type:
+                        materials_yield = self.BLOCK_YIELDS.get(block_type, {block_type: 1}).copy()
                         
                         # Filtrar materials: només afegim a l'inventari el que REALMENT necessitem
                         useful_materials = {}
@@ -147,25 +155,23 @@ class GridSearchStrategy(MiningStrategy):
                                 if current < needed:
                                     useful_materials[mat] = qty
                         else:
-                            useful_materials = materials_yield # Si no hi ha requirements, ho guardem tot (o res? assumim mode requirements)
+                            useful_materials = materials_yield 
 
                         collected_materials = self._merge_materials(collected_materials, useful_materials)
                         working_inventory = self.update_inventory(working_inventory, useful_materials)
-
                     
                     self.materials_collected = collected_materials.copy()
                     
-                    # Sleep optimitzat: cedir el control cada 10 comprovacions en lloc de cada 1
+                    # Sleep optimitzat
                     check_counter += 1
                     if check_counter % 10 == 0:
                         time.sleep(0.01)
 
                     if requirements and self.validate_requirements(working_inventory, requirements):
-                        logger.info("Requeriments assolits, aturant cerca en graella")
-                        self.materials_collected = collected_materials.copy()
+                        logger.info("Requeriments assolits, aturant minería.")
                         return collected_materials
         
-        logger.info(f"Cerca en graella completada. Blocs minats: {self.blocks_mined}")
+        logger.info(f"Minería completada. Blocs minats: {self.blocks_mined}")
         return collected_materials
     
     def _merge_materials(self, dict1: Dict, dict2: Dict) -> Dict:
