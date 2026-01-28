@@ -4,11 +4,14 @@ from utils.visuals import mark_bot
 from mcpi import block as mcblock
 import time
 import logging
+import csv
+import os
+from utils.validators import es_fila_valida
 
 logger = logging.getLogger(__name__)
 
 class BuilderBot(BaseAgent):
-    """Agent que construeix plataformes 4x4 amb terra i pedra."""
+    """Agent que construeix qualsevol dels planols generats."""
     def __init__(self, name, message_bus, mc, mc_lock=None, system_flags=None):
         super().__init__(name, system_flags)
         self.message_bus = message_bus
@@ -22,6 +25,10 @@ class BuilderBot(BaseAgent):
             "castell": {
                 "bom": {"sandstone": 25, "stone": 45},
                 "generator": self._generate_castell_plan
+            },
+            "chess": {
+                "bom": {"stone": 18, "dirt": 18},
+                "generator": self._generate_chess_plan
             }
         }
         self.current_plan_name = "plataforma"
@@ -191,41 +198,36 @@ class BuilderBot(BaseAgent):
                 plan.append((x + dx, platform_y, z + dz, material))
         return plan
 
+    def _load_plan_from_csv(self, filename, x, y, z):
+        """Mètode per carregar plans des de CSV amb programació funcional."""
+        # Filter per filtrar les files que no son vàlides
+        # Map per convertir les files vàlides en blocs absoluts
+        csv_path = os.path.join("data", "plans", filename)
+        
+        def to_absolute_block(row):
+            dx, dy, dz = int(row["dx"]), int(row["dy"]), int(row["dz"])
+            material = row["material"]
+            return (x + dx, y + dy, z + dz, material)
+
+        try:
+            with open(csv_path, mode='r', newline='') as f:
+                reader = csv.DictReader(f)
+                valid_rows = filter(es_fila_valida, reader)
+                return list(map(to_absolute_block, valid_rows))
+        except FileNotFoundError:
+            self.log.error(f"Error: No s'ha trobat el fitxer de pla: {csv_path}")
+            return []
+        except Exception as e:
+            self.log.error(f"Error llegint el pla {filename}: {e}")
+            return []
+
     def _generate_castell_plan(self, x, y, z):
-        """Genera el pla 'castell'
-        Base 5x5 sandstone.
-        Murs stone alternant 2 i 3 d'alçada .
-        """
-        plan = []
-        base_y = y + 1
-        
-        # 1- Base 5x5 Sandstone
-        for dx in range(5):
-            for dz in range(5):
-                plan.append((x + dx, base_y, z + dz, "sandstone"))
-                
-        # 2- Murs: Stone
-        # Altures: 
-        # Capa 1 (base_y + 1): Tot el perímetre
-        # Capa 2 (base_y + 2): Tot el perímetre
-        # Capa 3 (base_y + 3): Alternant
-        
-        wall_heights = 3
-        
-        for h in range(1, wall_heights + 1):
-            current_y = base_y + h
-            for dx in range(5):
-                for dz in range(5):
-                    is_border = (dx == 0 or dx == 4 or dz == 0 or dz == 4)
-                    
-                    if is_border:
-                        if h == 3:
-                            if (dx + dz) % 2 == 0:
-                                plan.append((x + dx, current_y, z + dz, "stone"))
-                        else:
-                            plan.append((x + dx, current_y, z + dz, "stone"))
-                            
-        return plan
+        """Genera el pla 'castell' llegint des d'un CSV."""
+        return self._load_plan_from_csv("castell.csv", x, y, z)
+
+    def _generate_chess_plan(self, x, y, z):
+        """Genera el pla 'chess' (plataforma ajedrezada) llegint des d'un CSV."""
+        return self._load_plan_from_csv("chess.csv", x, y, z)
 
     def _build_next_block(self):
         """Construeix el següent bloc del pla."""
