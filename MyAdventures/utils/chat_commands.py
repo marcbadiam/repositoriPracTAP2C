@@ -121,6 +121,8 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
         _safe_post("-builder build             Construeix plataforma")
         _safe_post("-miner start               Inicia mineria")
         _safe_post("-agent status              Mostra estat agents")
+        _safe_post("-agent pause               Pausa l'agent actiu")
+        _safe_post("-agent resume              Repren l'agent pausat")
     
     handler.register('agent help', help_command)
     handler.register('help', help_command)
@@ -131,6 +133,32 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
             _safe_post(f"{name}: {agent.state.name}")
     
     handler.register('agent status', status_command)
+
+    def agent_pause_all(args):
+        """Pausa qualsevol agent que estigui executant-se."""
+        count = 0
+        for name, agent in agents_dict.items():
+            if agent.state == AgentState.RUNNING:
+                agent.pause()
+                _safe_post(f"[{name}] Pausat automàticament.")
+                count += 1
+        if count == 0:
+            _safe_post("Cap agent actiu per pausar.")
+
+    handler.register('agent pause', agent_pause_all)
+
+    def agent_resume_all(args):
+        """Repren qualsevol agent que estigui pausat."""
+        count = 0
+        for name, agent in agents_dict.items():
+            if agent.state == AgentState.PAUSED:
+                agent.resume()
+                _safe_post(f"[{name}] Repres automàticament.")
+                count += 1
+        if count == 0:
+            _safe_post("Cap agent pausat per reprendre.")
+
+    handler.register('agent resume', agent_resume_all)
     
     # Explorer commands
     def explorer_start(args):
@@ -256,29 +284,6 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
     handler.register('workflow run', workflow_run)
     
     # Agent control commands (pause, resume, stop)
-    for name, agent in agents_dict.items():
-        agent_prefix = name.lower().replace('bot', '')
-        
-        def make_pause_handler(a, agent_name):
-            def pause_cmd(args):
-                a.handle_command('pause', args)
-                _safe_post(f"[{agent_name}] Pausat")
-            return pause_cmd
-        
-        def make_resume_handler(a, agent_name):
-            def resume_cmd(args):
-                a.handle_command('resume', args)
-                _safe_post(f"[{agent_name}] Repres")
-            return resume_cmd
-        
-        def make_stop_handler(a, agent_name):
-            def stop_cmd(args):
-                a.handle_command('stop', args)
-                _safe_post(f"[{agent_name}] Aturat")
-            return stop_cmd
-        
-        handler.register(f'{agent_prefix} pause', make_pause_handler(agent, name))
-        handler.register(f'{agent_prefix} resume', make_resume_handler(agent, name))
-        handler.register(f'{agent_prefix} stop', make_stop_handler(agent, name))
-    
+    # Generic commands are now preferred (see agent_pause_all / agent_resume_all)
+
     return handler

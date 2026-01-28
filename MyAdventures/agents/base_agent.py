@@ -130,6 +130,16 @@ class BaseAgent(ABC):
                 # Espera cooperativa per reduir ús de CPU i permetre parada ràpida
                 self._stop_event.wait(self._tick_interval)
 
+    def pause(self):
+        """Pausa l'agent."""
+        if self.state == AgentState.RUNNING:
+            self.set_state(AgentState.PAUSED, "Pausat per comanda")
+
+    def resume(self):
+        """Repren l'agent."""
+        if self.state == AgentState.PAUSED:
+            self.set_state(AgentState.RUNNING, "Repres per comanda")
+
     def stop_loop(self):
         """Atura el fil de l'agent i espera la seva finalització."""
         self._stop_event.set()

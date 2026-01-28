@@ -214,6 +214,18 @@ class MinerBot(BaseAgent):
             self.strategies[self.current_strategy_index].handle_stop()
         self.log.info("Mineria aturada.")
         
+    def pause(self):
+        """Pausa el MinerBot i la seva estratègia actual."""
+        super().pause()
+        if self.strategies and 0 <= self.current_strategy_index < len(self.strategies):
+            self.strategies[self.current_strategy_index].handle_pause()
+
+    def resume(self):
+        """Repren el MinerBot i la seva estratègia actual."""
+        super().resume()
+        if self.strategies and 0 <= self.current_strategy_index < len(self.strategies):
+            self.strategies[self.current_strategy_index].handle_resume()
+
     def reset(self):
         """Reseteja l'estat del MinerBot."""
         self.log.info("Resetejant MinerBot...")
