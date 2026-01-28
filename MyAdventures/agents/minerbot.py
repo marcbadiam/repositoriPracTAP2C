@@ -9,8 +9,8 @@ logger = logging.getLogger(__name__)
 
 class MinerBot(BaseAgent):
     """Agent que mina blocs de terra i pedra, recolectant recursos."""
-    def __init__(self, name, message_bus, mc, mc_lock=None):
-        super().__init__(name)
+    def __init__(self, name, message_bus, mc, mc_lock=None, system_flags=None):
+        super().__init__(name, system_flags)
         self.message_bus = message_bus
         self.mc = mc
         self.mc_lock = mc_lock
@@ -75,7 +75,9 @@ class MinerBot(BaseAgent):
         if msg_type == "materials.requirements.v1":
             self._handle_requirements(msg)
         elif msg_type == "build.complete.v1":
-            self.stop()
+            self.log.info("Construcció completada. Resetejant estat del MinerBot.")
+            self.reset()
+            # self.reset() posa estat en IDLE, no cal stop() a menys que vulguem STOPPED
         elif msg_type == "workflow.reset":
             self.reset()
 
@@ -86,7 +88,13 @@ class MinerBot(BaseAgent):
         for req in self.requirements:
             if req not in self.inventory:
                 self.inventory[req] = 0
-        self.start()
+        
+        # Comprova el flag del workflow
+        if self.system_flags.get("workflow_mode", False):
+            self.start()
+        else:
+             self.set_state(AgentState.WAITING, "Requeriments rebuts (Manual). Esperant comanda -miner start.")
+             self.log.info("Mode Manual: No s'inicia la mineria automàticament.")
 
     def perceive(self):
         """Percepció"""

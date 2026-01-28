@@ -47,10 +47,13 @@ def main():
     bus = MessageBus()
     logger.info("[OK] Bus de missatges inicialitzat (Mode Broadcast)")
     
+    # Inicialitza Flags del Sistema 
+    system_flags = {"workflow_mode": False}
+    
     # Inicialitzar Agents
-    explorer = ExplorerBot("ExplorerBot", bus, mc, mc_lock)
-    miner = MinerBot("MinerBot", bus, mc, mc_lock)
-    builder = BuilderBot("BuilderBot", bus, mc, mc_lock)
+    explorer = ExplorerBot("ExplorerBot", bus, mc, mc_lock, system_flags)
+    miner = MinerBot("MinerBot", bus, mc, mc_lock, system_flags)
+    builder = BuilderBot("BuilderBot", bus, mc, mc_lock, system_flags)
     
     agents_dict = {
         "ExplorerBot": explorer,
@@ -65,7 +68,7 @@ def main():
     logger.info("[OK] Fils d'agents en execució")
 
     # Configurar Gestor de Comandes
-    cmd_handler = create_default_handlers(agents_dict, mc, mc_lock)
+    cmd_handler = create_default_handlers(agents_dict, mc, mc_lock, system_flags)
     logger.info("[OK] Sistema de comandes de xat inicialitzat")
     
     safe_mc_post(mc, mc_lock, "Sistema Multi-Agente iniciado! Escribe '-explorer start' para comenzar.")

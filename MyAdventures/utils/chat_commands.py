@@ -93,7 +93,7 @@ class ChatCommandHandler:
         return False
 
 
-def create_default_handlers(agents_dict, mc, mc_lock=None):
+def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
     """Crea els gestors de comandes per defecte.
     
     Args:
@@ -136,9 +136,13 @@ def create_default_handlers(agents_dict, mc, mc_lock=None):
     def explorer_start(args):
         explorer = agents_dict.get("ExplorerBot")
         if explorer:
+            # Mode Manual: Desactivem flag de workflow
+            if system_flags is not None:
+                system_flags["workflow_mode"] = False
+                
             explorer.map_sent = False
-            explorer.set_state(AgentState.RUNNING, reason="User command")
-            _safe_post("[ExplorerBot] Exploració iniciada")
+            explorer.set_state(AgentState.RUNNING, reason="Comanda usuari (manual)")
+            _safe_post("[ExplorerBot] Exploració iniciada (Mode Manual)")
         else:
             _safe_post("ExplorerBot no trobat")
     
@@ -148,8 +152,12 @@ def create_default_handlers(agents_dict, mc, mc_lock=None):
     def builder_build(args):
         builder = agents_dict.get("BuilderBot")
         if builder and builder.target_zone:
-            builder.set_state(AgentState.RUNNING, reason="User command")
-            _safe_post("[BuilderBot] Construcció iniciada")
+            # Mode Manual: Desactivem flag de workflow
+            if system_flags is not None:
+                system_flags["workflow_mode"] = False
+
+            builder.set_state(AgentState.RUNNING, reason="User command (manual)")
+            _safe_post("[BuilderBot] Construcció iniciada (Mode Manual)")
         else:
             _safe_post("[BuilderBot] Error: Executa -explorer start primer")
     
@@ -173,8 +181,12 @@ def create_default_handlers(agents_dict, mc, mc_lock=None):
     def miner_start(args):
         miner = agents_dict.get("MinerBot")
         if miner:
+            # Mode Manual: Desactivem flag de workflow
+            if system_flags is not None:
+                system_flags["workflow_mode"] = False
+                
             miner.start()
-            _safe_post("[MinerBot] Mineria iniciada")
+            _safe_post("[MinerBot] Mineria iniciada (Mode Manual)")
         else:
             _safe_post("MinerBot no trobat")
     
@@ -205,6 +217,11 @@ def create_default_handlers(agents_dict, mc, mc_lock=None):
         _safe_post("=" * 40)
         _safe_post("[Workflow] INICIANT FLUX COMPLET")
         _safe_post("=" * 40)
+        
+        # Activar flag workflow
+        if system_flags is not None:
+            system_flags["workflow_mode"] = True
+            logger.info("WORKFLOW MODE: ACTIVAT")
         
         # Global Reset
         _safe_post("Resetejant estat del sistema...")

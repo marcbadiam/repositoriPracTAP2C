@@ -9,8 +9,8 @@ logger = logging.getLogger(__name__)
 
 class BuilderBot(BaseAgent):
     """Agent que construeix plataformes 4x4 amb terra i pedra."""
-    def __init__(self, name, message_bus, mc, mc_lock=None):
-        super().__init__(name)
+    def __init__(self, name, message_bus, mc, mc_lock=None, system_flags=None):
+        super().__init__(name, system_flags)
         self.message_bus = message_bus
         self.mc = mc
         self.mc_lock = mc_lock
@@ -87,8 +87,18 @@ class BuilderBot(BaseAgent):
     def _handle_map_v1(self, msg):
         self.target_zone = msg.get("payload", {}).get("zone")
         self.log.info(f"Nova zona de construcció rebuda: {self.target_zone}")
-        self.set_state(AgentState.WAITING, "Zona rebuda, esperant materials")
-        self._request_materials()
+        
+        # Reseteja l'estat del builder per a la nova tasca
+        self.build_plan = []
+        self.build_index = 0
+        
+        # Comprova el flag del workflow
+        if self.system_flags.get("workflow_mode", False):
+            self.set_state(AgentState.WAITING, "Zona rebuda, esperant materials (Workflow)")
+            self._request_materials()
+        else:
+            self.set_state(AgentState.WAITING, "Zona rebuda (Manual). Esperant comanda -builder build.")
+            self.log.info("Mode Manual: No es demanen materials automàticament.")
 
     def _handle_inventory_v1(self, msg):
         received_inventory = msg.get("payload", {}).get("inventory", {})
@@ -116,11 +126,19 @@ class BuilderBot(BaseAgent):
         """Comprova si té tot el necessari per començar a construir."""
         if self.state == AgentState.WAITING and self.target_zone:
             if all(self.inventory.get(k, 0) >= v for k, v in self.bom.items()):
-                self.log.info("Materials suficients. Iniciant construcció.")
-                self.set_state(AgentState.RUNNING, "Materials disponibles")
+                # Nomes auto-start si esta en mode workflow
+                if self.system_flags.get("workflow_mode", False):
+                    self.log.info("Materials suficients. Iniciant construcció (Workflow).")
+                    self.set_state(AgentState.RUNNING, "Materials disponibles")
+                else:
+                    self.log.info("Materials suficients. Esperant comanda -builder build (Manual).")
             else:
-                self.log.info("Encara falten materials. Esperant...")
-                self._request_materials()
+                # Nomes auto-retry si esta en mode workflow
+                if self.system_flags.get("workflow_mode", False):
+                    self.log.info("Encara falten materials. Esperant...")
+                    self._request_materials()
+                else:
+                    self.log.info("Falten materials (Manual).")
 
     def perceive(self):
         """Percepció"""

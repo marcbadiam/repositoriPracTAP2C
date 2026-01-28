@@ -7,8 +7,8 @@ logger = logging.getLogger(__name__)
 
 class ExplorerBot(BaseAgent):
     """Agent que descobreix zones planes del terreny prop del jugador."""
-    def __init__(self, name, message_bus, mc, mc_lock=None):
-        super().__init__(name)
+    def __init__(self, name, message_bus, mc, mc_lock=None, system_flags=None):
+        super().__init__(name, system_flags)
         self.message_bus = message_bus
         self.mc = mc  # Instància de Minecraft
         self.mc_lock = mc_lock  # Lock per sincronitzar accés a mc

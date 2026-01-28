@@ -18,12 +18,13 @@ class AgentState(Enum):
 class BaseAgent(ABC):
     """Classe base abstracta per a tots els agents."""
     
-    def __init__(self, name):
+    def __init__(self, name, system_flags=None):
         # Inicialitza l'agent amb un nom i configura el logger
         self.name = name
         self.state = AgentState.IDLE
         self.log = logging.getLogger(self.name) # Logger específic per a l'agent
         self.checkpoint = {}  # Per guardar l'estat en pausa o repòs
+        self.system_flags = system_flags if system_flags is not None else {}
         self.log.info(f"{self.name} inicialitzat en estat {self.state.name}")
         self._stop_event = threading.Event()
         self._thread = None
