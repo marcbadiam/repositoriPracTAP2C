@@ -11,13 +11,11 @@ class VerticalSearchStrategy(MiningStrategy):
     Des del punt d'anchor, mina verticalment cap avall fins a la profunditat màxima.
     """
     
-    def __init__(self, min_depth: int = -60, max_depth: int = -1):
+    def __init__(self):
         """
         Inicialitzar estratègia de mina vertical.
         """
         super().__init__()
-        self.min_depth = min_depth
-        self.max_depth = max_depth
         self.current_depth = None
     
     def mine(self, mc=None, start_pos: Tuple[int, int, int] = None, 
@@ -55,7 +53,9 @@ class VerticalSearchStrategy(MiningStrategy):
         current_y = start_y
         block_types = ["stone", "dirt", "sand", "sandstone"]
         
-        while current_y >= self.min_depth:
+        # El bucle s'atura si arribem a Y=6 (definit dins del bucle)
+        # Posem un límit de seguretat de -64 (bedrock) per si de cas
+        while current_y >= -64:
             if current_y == 6:
                 logger.info(f"Y=6. Aturant cerca vertical i workflow.")
                 self.is_stopped = True
