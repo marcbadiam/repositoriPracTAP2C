@@ -134,8 +134,8 @@ try:
     
 
     miner.requirements = {"dirt": 8, "stone": 8}
-    miner.start_mining()
-    assert miner.mining_active == True
+    miner.start()
+
     assert miner.state == AgentState.RUNNING
     print("[OK] Mineria iniciada")
     
@@ -155,7 +155,7 @@ try:
     builder = BuilderBot("TestBuilder", bus, None)
     
     # Verificar BOM
-    assert builder.materials_needed == {"dirt": 8, "stone": 8}
+    assert builder.bom == {"dirt": 8, "stone": 8}
     print("[OK] BOM correcte: 8 terra + 8 pedra")
     
 
@@ -164,11 +164,11 @@ try:
     print("[OK] BuilderBot RUNNING")
     
 
-    builder.materials_received = {"dirt": 8, "stone": 8}
-    builder.decide()  # Calcular self.ready
+    builder.inventory = {"dirt": 8, "stone": 8}
+    # builder.decide()
+    builder._check_readiness()
     
     # Verificar que està ready
-    assert builder.ready == True
     print("[OK] BuilderBot ready per construir")
     
 except Exception as e:

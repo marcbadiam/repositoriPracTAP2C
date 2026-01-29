@@ -55,11 +55,11 @@ class GridSearchStrategy(MiningStrategy):
              return collected_materials
         
         if start_pos is None:
-            logger.warning("Cap posició inicial proporcionada per a cerca en graella")
+            logger.warning("Cap posició inicial proporcionada per a cerca en grid")
             return collected_materials
         
         self.current_position = start_pos
-        logger.info(f"Iniciando mineria per cerca en graella a {start_pos}")
+        logger.info(f"Iniciant mineria per cerca en grid a {start_pos}")
         
         start_x, start_y, start_z = start_pos
         
@@ -169,10 +169,10 @@ class GridSearchStrategy(MiningStrategy):
                         time.sleep(0.01)
 
                     if requirements and self.validate_requirements(working_inventory, requirements):
-                        logger.info("Requeriments assolits, aturant minería.")
+                        logger.info("Requeriments assolits, aturant mineria.")
                         return collected_materials
         
-        logger.info(f"Minería completada. Blocs minats: {self.blocks_mined}")
+        logger.info(f"Mineria completada. Blocs minats: {self.blocks_mined}")
         return collected_materials
     
     def _merge_materials(self, dict1: Dict, dict2: Dict) -> Dict:

@@ -43,7 +43,7 @@ class ExplorerBot(BaseAgent):
                 directions = [(1, 0), (0, 1), (-1, 0), (0, -1)]
                 found_zone = None
                 
-                from utils.visuals import place_marker_block
+                from utils.visuals import mark_bot
                 
                 for dx, dz in directions:
                     consecutive_count = 0
@@ -56,7 +56,7 @@ class ExplorerBot(BaseAgent):
                         y = self.mc.getHeight(check_x, check_z)
                         
                         # Marquem cada bloc inspeccionat
-                        place_marker_block(self.mc, check_x, y, check_z, color_data=11)
+                        mark_bot(self.mc, check_x, y, check_z, wool_color=11)
                         
                         if last_y is not None and y == last_y:
                             consecutive_count += 1
@@ -84,7 +84,7 @@ class ExplorerBot(BaseAgent):
                                 py = self.mc.getHeight(px, pz)
                                 
                                 # Marcatge visual de la comprovació extra
-                                place_marker_block(self.mc, px, py, pz, color_data=11)
+                                mark_bot(self.mc, px, py, pz, wool_color=11)
                                 
                                 if py != y:
                                     is_valid_cross = False
@@ -93,7 +93,7 @@ class ExplorerBot(BaseAgent):
                             if is_valid_cross:
                                 found_zone = (center_x, center_z, y)
                                 # Si finalment la zona es valida la marquem amb un bloc extra
-                                place_marker_block(self.mc, center_x, y + 1, center_z, color_data=11)
+                                mark_bot(self.mc, center_x, y + 1, center_z, wool_color=11)
                                 break
                             else:
                                 # Si falla la comprovació lateral, resetegem el comptador

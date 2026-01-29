@@ -47,7 +47,7 @@ class VerticalSearchStrategy(MiningStrategy):
         self.current_position = start_pos
         start_x, start_y, start_z = start_pos
         
-        logger.info(f"Iniciando mineria per cerca vertical a {start_pos}")
+        logger.info(f"Iniciant mineria per cerca vertical a {start_pos}")
         
         # Perforar cap avall des de la posició inicial
         current_y = start_y

@@ -71,7 +71,7 @@ def main():
     cmd_handler = create_default_handlers(agents_dict, mc, mc_lock, system_flags)
     logger.info("[OK] Sistema de comandes de xat inicialitzat")
     
-    safe_mc_post(mc, mc_lock, "Sistema Multi-Agente iniciado! Escribe '-explorer start' para comenzar.")
+    safe_mc_post(mc, mc_lock, "Sistema Multi-Agent iniciat! Escriu '-workflow run' o '-explorer start' per començar.")
     
     
     logger.info("")
