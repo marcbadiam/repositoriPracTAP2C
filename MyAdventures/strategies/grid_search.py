@@ -14,16 +14,14 @@ class GridSearchStrategy(MiningStrategy):
     amb un patró d'espaiament regular per assegurar extracció integral de recursos.
     """
     
-    def __init__(self, grid_spacing: int = 2, grid_size: int = 16):
+    def __init__(self, grid_size: int = 4):
         """
         Inicialitzar estratègia de cerca en graella.
         
         Args:
-            grid_spacing: Distància entre blocs minats a la graella (per defecte: 2)
-            grid_size: Mida de la regió cúbica a minar (per defecte: 16 blocs)
+            grid_size: Mida de la regió cúbica a minar (per defecte: 4 blocs)
         """
         super().__init__()
-        self.grid_spacing = grid_spacing
         self.grid_size = grid_size
     
     def mine(self, mc=None, start_pos: Tuple[int, int, int] = None, 
@@ -86,18 +84,18 @@ class GridSearchStrategy(MiningStrategy):
         check_counter = 0
 
         # Iterar a través dels punts de la graella
-        for x_offset in range(0, self.grid_size, self.grid_spacing):
+        for x_offset in range(0, self.grid_size):
             if self.is_stopped:
                 break
             while self.is_paused:
                 pass
             
-            for z_offset in range(0, self.grid_size, self.grid_spacing):
+            for z_offset in range(0, self.grid_size):
                 if self.is_stopped:
                     break
                 
-                # Escaneig de baix a dalt: -3, -2, -1, 0, 1, 2, 3
-                for y_offset in range(-(self.grid_size - 1), self.grid_size, self.grid_spacing):
+                # Escaneig de baix a dalt: 0 a grid_size
+                for y_offset in range(0, self.grid_size): #for y_offset in range(-(self.grid_size - 1), self.grid_size):
                     if self.is_stopped:
                         break
                     

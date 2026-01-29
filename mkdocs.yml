@@ -1,0 +1,44 @@
+site_name: MinecraftTAP
+theme:
+  name: material
+
+nav:
+  - Run: run.md
+  - Agents:
+      - Overview: agents/index.md
+      - Base Agent: agents/base_agent.md
+      - Builder Bot: agents/builderbot.md
+      - Explorer Bot: agents/explorerbot.md
+      - Miner Bot: agents/minerbot.md
+  - Strategies:
+      - Overview: strategies/index.md
+      - Strategy Base: strategies/strategy_base.md
+      - Grid Search: strategies/grid_search.md
+      - Vertical Search: strategies/vertical_search.md
+      - Build Plans:
+          - Overview: strategies/build_plans/index.md
+          - Base Plan: strategies/build_plans/base_plan.md
+          - Castell: strategies/build_plans/castell.md
+          - Chess: strategies/build_plans/chess.md
+          - Plataforma: strategies/build_plans/plataforma.md
+  - Utils:
+      - Overview: utils/index.md
+      - Chat Commands: utils/chat_commands.md
+      - Communication: utils/communication.md
+      - Discovery: utils/discovery.md
+      - Functional: utils/functional.md
+      - Logging Config: utils/logging_config.md
+      - Validators: utils/validators.md
+      - Visuals: utils/visuals.md
+
+
+plugins:
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [./MyAdventures]
+          options:
+            show_source: false 
+  - print-site:
+      add_to_navigation: true
+      print_page_title: "Documentación Completa PDF"

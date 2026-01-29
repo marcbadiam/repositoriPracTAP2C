@@ -37,11 +37,7 @@ class MinerBot(BaseAgent):
         
         for name in sorted_names:
             cls = strategy_classes[name]
-            # Si es GridSearchStrategy necessitem pasarli els paràmetres addicionals
-            if name == "GridSearchStrategy":
-                instance = cls(grid_spacing=1, grid_size=4)
-            else:
-                instance = cls()
+            instance = cls()
             self.strategies.append(instance)
             self.log.info(f"Estratègia carregada: {name}")
 
