@@ -4,9 +4,7 @@ from utils.visuals import mark_bot
 from mcpi import block as mcblock
 import time
 import logging
-import csv
-import os
-from utils.validators import es_fila_valida
+from utils.discovery import discover_build_plans
 
 logger = logging.getLogger(__name__)
 
@@ -17,22 +15,16 @@ class BuilderBot(BaseAgent):
         self.message_bus = message_bus
         self.mc = mc
         self.mc_lock = mc_lock
-        self.plans = {
-            "plataforma": {
-                "bom": {"dirt": 8, "stone": 8},
-                "generator": self._generate_plataforma_plan
-            },
-            "castell": {
-                "bom": {"sandstone": 25, "stone": 45},
-                "generator": self._generate_castell_plan
-            },
-            "chess": {
-                "bom": {"stone": 18, "dirt": 18},
-                "generator": self._generate_chess_plan
-            }
-        }
-        self.current_plan_name = "plataforma"
-        self.bom = self.plans[self.current_plan_name]["bom"]
+        
+        # Carreguem els plans dinamicament
+        self.plans = {}
+        self._load_plans()
+        
+        self.current_plan_name = next(iter(self.plans)) if self.plans else None
+        self.current_plan = self.plans.get(self.current_plan_name)
+        
+        self.bom = self.current_plan.bom
+
         self.inventory = {"dirt": 0, "stone": 0, "sandstone": 0}
         self.target_zone = None
         self.build_plan = []
@@ -42,6 +34,18 @@ class BuilderBot(BaseAgent):
         self.message_bus.subscribe(self.on_message)
         self.set_state(AgentState.IDLE)
 
+    def _load_plans(self):
+        """Descobreix i carrega els plans dinàmicament."""
+        plan_classes = discover_build_plans()
+        for name, cls in plan_classes.items():
+            try:
+                plan_instance = cls()
+                # Utilitza el nom definit en la propietat de la classe
+                self.plans[plan_instance.name] = plan_instance
+                self.log.info(f"Pla carregat: {plan_instance.name}")
+            except Exception as e:
+                self.log.error(f"Error carregant pla {name}: {e}")
+
     def switch_plan(self, plan_name):
         """Canvia el pla de construcció actiu."""
         if plan_name not in self.plans:
@@ -49,7 +53,8 @@ class BuilderBot(BaseAgent):
             return False
         
         self.current_plan_name = plan_name
-        self.bom = self.plans[plan_name]["bom"]
+        self.current_plan = self.plans[plan_name]
+        self.bom = self.current_plan.bom
        
         for mat in self.bom:
             if mat not in self.inventory:
@@ -67,9 +72,9 @@ class BuilderBot(BaseAgent):
         except ValueError:
             next_index = 0
             
-        next_plan = plan_names[next_index]
-        self.switch_plan(next_plan)
-        return next_plan, self.plans[next_plan]["bom"]
+        next_plan_name = plan_names[next_index]
+        self.switch_plan(next_plan_name)
+        return next_plan_name, self.plans[next_plan_name].bom
 
     def on_message(self, msg):
         """Gestiona missatges rebuts."""
@@ -182,52 +187,15 @@ class BuilderBot(BaseAgent):
             if self.mc_lock: self.mc_lock.release()
 
         
-        generator = self.plans[self.current_plan_name]["generator"]
-        self.build_plan = generator(x, y, z)
+        if not self.current_plan:
+            self.log.error("No hi ha cap pla seleccionat!")
+            return
+
+        self.build_plan = self.current_plan.generate(x, y, z)
         
         self.log.info(f"Pla de construcció '{self.current_plan_name}' creat amb {len(self.build_plan)} blocs.")
         self.build_index = 0
 
-    def _generate_plataforma_plan(self, x, y, z):
-        """Genera el pla clàssic 4x4 (plataforma)."""
-        plan = []
-        platform_y = y + 1
-        for dx in range(4):
-            for dz in range(4):
-                material = "dirt" if dx < 2 else "stone"
-                plan.append((x + dx, platform_y, z + dz, material))
-        return plan
-
-    def _load_plan_from_csv(self, filename, x, y, z):
-        """Mètode per carregar plans des de CSV amb programació funcional."""
-        # Filter per filtrar les files que no son vàlides
-        # Map per convertir les files vàlides en blocs absoluts
-        csv_path = os.path.join("data", "plans", filename)
-        
-        def to_absolute_block(row):
-            dx, dy, dz = int(row["dx"]), int(row["dy"]), int(row["dz"])
-            material = row["material"]
-            return (x + dx, y + dy, z + dz, material)
-
-        try:
-            with open(csv_path, mode='r', newline='') as f:
-                reader = csv.DictReader(f)
-                valid_rows = filter(es_fila_valida, reader)
-                return list(map(to_absolute_block, valid_rows))
-        except FileNotFoundError:
-            self.log.error(f"Error: No s'ha trobat el fitxer de pla: {csv_path}")
-            return []
-        except Exception as e:
-            self.log.error(f"Error llegint el pla {filename}: {e}")
-            return []
-
-    def _generate_castell_plan(self, x, y, z):
-        """Genera el pla 'castell' llegint des d'un CSV."""
-        return self._load_plan_from_csv("castell.csv", x, y, z)
-
-    def _generate_chess_plan(self, x, y, z):
-        """Genera el pla 'chess' (plataforma ajedrezada) llegint des d'un CSV."""
-        return self._load_plan_from_csv("chess.csv", x, y, z)
 
     def _build_next_block(self):
         """Construeix el següent bloc del pla."""
@@ -276,8 +244,12 @@ class BuilderBot(BaseAgent):
     def reset(self):
         """Reseteja l'estat del BuilderBot per a un nou workflow."""
         self.log.info("Resetejant BuilderBot...")
-        self.bom = self.plans[self.current_plan_name]["bom"]
-        self.inventory = {k: 0 for k in self.bom}
+        self.log.info("Resetejant BuilderBot...")
+        if self.current_plan:
+            self.bom = self.current_plan.bom
+            self.inventory = {k: 0 for k in self.bom}
+        else:
+             self.inventory = {}
         self.target_zone = None
         self.build_plan = []
         self.build_index = 0

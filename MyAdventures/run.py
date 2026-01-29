@@ -5,11 +5,9 @@ Manté el sistema obert i respon a comandes de xat.
 import time
 import logging
 import threading
-from agents.explorerbot import ExplorerBot
-from agents.minerbot import MinerBot
-from agents.builderbot import BuilderBot
 from agents.base_agent import AgentState
 from utils.communication import MessageBus
+from utils.discovery import discover_agents
 from utils.logging_config import setup_logging
 from utils.chat_commands import create_default_handlers
 
@@ -50,17 +48,17 @@ def main():
     # Inicialitza Flags del Sistema 
     system_flags = {"workflow_mode": False}
     
-    # Inicialitzar Agents
-    explorer = ExplorerBot("ExplorerBot", bus, mc, mc_lock, system_flags)
-    miner = MinerBot("MinerBot", bus, mc, mc_lock, system_flags)
-    builder = BuilderBot("BuilderBot", bus, mc, mc_lock, system_flags)
+    # Descobrir i inicialitzar agents
+    agents_dict = {}
+    agent_classes = discover_agents()
     
-    agents_dict = {
-        "ExplorerBot": explorer,
-        "MinerBot": miner,
-        "BuilderBot": builder
-    }
-    logger.info("[OK] Agents creats: ExplorerBot, MinerBot, BuilderBot")
+    for name, agent_cls in agent_classes.items():
+        # inicialitza agent
+        agent_instance = agent_cls(name, bus, mc, mc_lock, system_flags)
+        agents_dict[name] = agent_instance
+        logger.info(f"[OK] Agent inicialitzat: {name}")
+
+    logger.info(f"[OK] Total agents creats: {len(agents_dict)}")
 
     # Iniciar Threads
     for agent in agents_dict.values():
