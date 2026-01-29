@@ -282,8 +282,5 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
         explorer.handle_command('start', {})
     
     handler.register('workflow run', workflow_run)
-    
-    # Agent control commands (pause, resume, stop)
-    # Generic commands are now preferred (see agent_pause_all / agent_resume_all)
 
     return handler

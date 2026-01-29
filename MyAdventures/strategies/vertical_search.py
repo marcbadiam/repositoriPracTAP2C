@@ -7,20 +7,13 @@ logger = logging.getLogger(__name__)
 
 
 class VerticalSearchStrategy(MiningStrategy):
-    """Perfora cap avall a través de capes per extreure recursos a profunditats creixents.
-    
-    Aquesta estratègia mina blocs verticalment cap avall des de la posició inicial,
-    extraient recursos a nivells progressivament més profunds. Els recursos més valuosos
-    s'hi troben típicament a major profunditat.
+    """
+    Des del punt d'anchor, mina verticalment cap avall fins a la profunditat màxima.
     """
     
     def __init__(self, min_depth: int = -60, max_depth: int = -1):
         """
-        Inicialitzar estratègia de cerca vertical.
-        
-        Args:
-            min_depth: Profunditat mínima (coordenada Y) a minar (per defecte: -60 en MC recent)
-            max_depth: Profunditat màxima (coordenada Y) a minar (per defecte: -1)
+        Inicialitzar estratègia de mina vertical.
         """
         super().__init__()
         self.min_depth = min_depth
@@ -63,6 +56,11 @@ class VerticalSearchStrategy(MiningStrategy):
         block_types = ["stone", "dirt", "sand", "sandstone"]
         
         while current_y >= self.min_depth:
+            if current_y == 6:
+                logger.info(f"Y=6. Aturant cerca vertical i workflow.")
+                self.is_stopped = True
+                break
+
             if self.is_stopped:
                 logger.info(f"Cerca vertical aturat a profunditat {current_y}")
                 break

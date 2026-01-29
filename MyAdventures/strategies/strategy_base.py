@@ -19,6 +19,7 @@ class MiningStrategy(ABC):
         "stone": {"stone": 1},
         "dirt": {"dirt": 1},
         "sand": {"sand": 1},
+        "sandstone": {"sandstone": 1},
     }
     
     def __init__(self):
@@ -130,6 +131,7 @@ class MiningStrategy(ABC):
                 "stone": {mcblock.STONE.id},
                 "dirt": {mcblock.DIRT.id, mcblock.GRASS.id},
                 "sand": {mcblock.SAND.id},
+                "sandstone": {mcblock.SANDSTONE.id},
             }.get(block_type, set())
 
             if existing_id not in allowed_ids:

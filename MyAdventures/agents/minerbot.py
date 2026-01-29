@@ -15,6 +15,8 @@ class MinerBot(BaseAgent):
         self.mc = mc
         self.mc_lock = mc_lock
         
+        self.color = 1
+        
         # Carrega les estratègies dinàmicament
         self.strategies = []
         self._load_strategies()
@@ -125,8 +127,9 @@ class MinerBot(BaseAgent):
         try:
             p = self.mc.player.getTilePos()
             self.anchor_pos = (p.x, p.y - 1, p.z)
-            mark_bot(self.mc, p.x - 2, p.y + 1, p.z - 2, wool_color=1, label=self.name)
-            self.log.info(f"Posició d'ancoratge establerta a {self.anchor_pos}")
+            mark_bot(self.mc, self.anchor_pos[0], self.anchor_pos[1] + 4, self.anchor_pos[2], 
+                     wool_color=self.color, label=f"{self.name}_Anchor")
+            self.log.info(f"Posició d'anchor establerta a {self.anchor_pos}")
         finally:
             if self.mc_lock: self.mc_lock.release()
 
@@ -155,6 +158,13 @@ class MinerBot(BaseAgent):
         
         # Bloc a bloc i no bloquejem per tota l'estratègia
         collected = strategy.mine(self.mc, self.anchor_pos, self.inventory, self.requirements, mc_lock=self.mc_lock)
+        
+        if strategy.is_stopped:
+             self.log.info("Estratègia parada. Parant MinerBot.")
+             if self.mc:
+                self.mc.postToChat(f"[{self.name}] Estratègia parada a Y=6. Finalitzant workflow.")
+             self.stop()
+             return
 
         progress_made = False
         if collected:
@@ -184,7 +194,9 @@ class MinerBot(BaseAgent):
                 return
 
              self.anchor_pos = (self.anchor_pos[0], new_y, self.anchor_pos[2])
-             self.log.info(f"Nova posició d'ancoratge: {self.anchor_pos}")
+             mark_bot(self.mc, self.anchor_pos[0], self.anchor_pos[1] + 4, self.anchor_pos[2], 
+                      wool_color=self.color, label=f"{self.name}_Anchor")
+             self.log.info(f"Nova posició d'anchor: {self.anchor_pos}")
              # El bucle torna a cridar _mine_resources en el següent cicle act() des de la nova posicio
 
     def _publish_inventory(self, final=False):

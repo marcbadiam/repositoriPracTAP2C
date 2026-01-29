@@ -37,11 +37,81 @@ class ExplorerBot(BaseAgent):
                 self.mc_lock.acquire()
             try:
                 p = self.mc.player.getTilePos()
-                base_x, base_z = int(p.x) + 2, int(p.z) + 2
-                y = self.mc.getHeight(base_x, base_z)
-                # es simula que es troba la zona plana a x+2 z+2
-                self.terrain_map = {"flat_zones": [(base_x, base_z, y)]}
-                self.log.debug(f"Terreny percebut: {self.terrain_map}")
+                base_x, base_z = int(p.x), int(p.z)
+                
+                # Cerca de zona plana en 4 direccions: (+x, +z, -x, -z)
+                directions = [(1, 0), (0, 1), (-1, 0), (0, -1)]
+                found_zone = None
+                
+                from utils.visuals import place_marker_block
+                
+                for dx, dz in directions:
+                    consecutive_count = 0
+                    last_y = None
+                    
+                    # Recorre 40 blocs en la direcció actual
+                    for i in range(1, 41):
+                        check_x = base_x + (dx * i)
+                        check_z = base_z + (dz * i)
+                        y = self.mc.getHeight(check_x, check_z)
+                        
+                        # Marquem cada bloc inspeccionat
+                        place_marker_block(self.mc, check_x, y, check_z, color_data=11)
+                        
+                        if last_y is not None and y == last_y:
+                            consecutive_count += 1
+                        else:
+                            consecutive_count = 1
+                            last_y = y
+                            
+                        # Si trobem 7 blocs seguits al mateix nivell
+                        if consecutive_count >= 7:
+                            # Calculem el centre de la zona (retrocedim 3 posicions). 7 blocs -> el 4t és el centre (i-3)
+                            center_offset = i - 3
+                            center_x = base_x + (dx * center_offset)
+                            center_z = base_z + (dz * center_offset)
+                            
+                            # Ara comprovem els eixos perpendiculars
+                            # Si ens movem en X (dx!=0), comprovem Z. Si ens movem en Z (dz!=0), comprovem X.
+                            perp_dx, perp_dz = (0, 1) if abs(dx) > 0 else (1, 0)
+                            
+                            is_valid_cross = True
+                            for k in range(-3, 4):
+                                if k == 0: continue # El centre ja sabem que esta a l'altura
+                                
+                                px = center_x + (k * perp_dx)
+                                pz = center_z + (k * perp_dz)
+                                py = self.mc.getHeight(px, pz)
+                                
+                                # Marcatge visual de la comprovació extra
+                                place_marker_block(self.mc, px, py, pz, color_data=11)
+                                
+                                if py != y:
+                                    is_valid_cross = False
+                                    break
+                            
+                            if is_valid_cross:
+                                found_zone = (center_x, center_z, y)
+                                # Si finalment la zona es valida la marquem amb un bloc extra
+                                place_marker_block(self.mc, center_x, y + 1, center_z, color_data=11)
+                                break
+                            else:
+                                # Si falla la comprovació lateral, resetegem el comptador
+                                consecutive_count = 0
+                    
+                    if found_zone:
+                        break
+                
+                if found_zone:
+                    self.terrain_map = {"flat_zones": [found_zone]}
+                    self.log.debug(f"Terreny percebut: {self.terrain_map}")
+                else:
+                    msg = "No s'ha trobat cap zona plana en les direccions explorades."
+                    self.log.info(msg)
+                    self.mc.postToChat(f"[{self.name}] {msg}")
+                    # Aturem el workflow ja que no s'ha trobat zona
+                    self.set_state(AgentState.STOPPED, reason="Zona plana no trobada")
+                    
             finally:
                 if self.mc_lock:
                     self.mc_lock.release()
@@ -67,7 +137,6 @@ class ExplorerBot(BaseAgent):
 
         x, z, y = self.target_zone
         
-        # Col·loca un marcador visible (blau) a la zona objectiu amb lock
         if self.mc_lock:
             self.mc_lock.acquire()
         try:
