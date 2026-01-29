@@ -112,17 +112,12 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
         finally:
             if mc_lock:
                 mc_lock.release()
-    
+
     # Comanda help
     def help_command(args):
         _safe_post("=== COMANDES DISPONIBLES ===")
-        _safe_post("-workflow run              Executa flux complet")
-        _safe_post("-explorer start            Inicia exploració")
-        _safe_post("-builder build             Construeix plataforma")
-        _safe_post("-miner start               Inicia mineria")
-        _safe_post("-agent status              Mostra estat agents")
-        _safe_post("-agent pause               Pausa l'agent actiu")
-        _safe_post("-agent resume              Repren l'agent pausat")
+        for cmd in sorted(handler.handlers.keys()):
+            _safe_post(f"-{cmd}")
     
     handler.register('agent help', help_command)
     handler.register('help', help_command)
@@ -160,8 +155,20 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
 
     handler.register('agent resume', agent_resume_all)
     
+    def stop_all_active_agents():
+        """Atura i reseteja tots els agents"""
+        count = 0
+        for name, agent in agents_dict.items():
+            # Executem reset en tots els agents per netejar flags i estats
+            agent.reset()
+            count += 1
+        return count
+
     # Explorer commands
     def explorer_start(args):
+        # Aturar i netejar sessió anterior
+        stop_all_active_agents()
+        
         explorer = agents_dict.get("ExplorerBot")
         if explorer:
             # Mode Manual: Desactivem flag de workflow
@@ -183,7 +190,7 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
             # Mode Manual: Desactivem flag de workflow
             if system_flags is not None:
                 system_flags["workflow_mode"] = False
-
+ 
             builder.set_state(AgentState.RUNNING, reason="User command (manual)")
             _safe_post("[BuilderBot] Construcció iniciada (Mode Manual)")
         else:
@@ -243,28 +250,23 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
         
         _safe_post("")
         _safe_post("=" * 40)
-        _safe_post("[Workflow] INICIANT FLUX COMPLET")
+        _safe_post("[Workflow] INICIANT FLUX COMPLET (NOVA SESSIO)")
         _safe_post("=" * 40)
+
+        # Aturar tot el que hi hagi abans
+        stop_all_active_agents()
         
         # Activar flag workflow
         if system_flags is not None:
             system_flags["workflow_mode"] = True
             logger.info("WORKFLOW MODE: ACTIVAT")
         
-        # Global Reset
-        _safe_post("Resetejant estat del sistema...")
-        # Enviar missatge de reset per assegurar neteja estats interns
+        # Potser no cal fer el reset des el bus?
         if explorer and hasattr(explorer, "message_bus"):
              from utils.communication import MessageProtocol
              rst_msg = MessageProtocol.create_message("workflow.reset", "User", "all", {})
              explorer.message_bus.publish(rst_msg)
         
-        # Cridar explícitament reset en tots els agents per estar segurs
-        for name, agent in agents_dict.items():
-             if hasattr(agent, 'reset'):
-                 agent.reset()
-        
-        # Validar que tots els agents estan llestos/running (Wait a bit for resets?)
         import time
         time.sleep(0.5)
 
@@ -274,6 +276,7 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
                  logger.info(f"Reiniciant fil d'execució per a {name}")
                  agent.start_loop()
              
+             # Si estava STOPPED manualment, el tornem a IDLE
              if agent.state == AgentState.STOPPED:
                  agent.set_state(AgentState.IDLE, reason="Workflow restart")
 
