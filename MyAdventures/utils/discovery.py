@@ -43,9 +43,9 @@ def discover_classes(package_name, base_class):
             for name, obj in inspect.getmembers(module, inspect.isclass):
                 # Verifica que la classe es defineix en aquest mòdul i hereta de base_class
                 if (
-                    obj.__module__ == full_module_name
-                    and issubclass(obj, base_class)
-                    and obj != base_class
+                    obj.__module__ == full_module_name and
+                    issubclass(obj, base_class) and
+                    obj != base_class
                 ):
                     discovered[name] = obj
                     logger.info(f"Descoberta {name} de {full_module_name}")
