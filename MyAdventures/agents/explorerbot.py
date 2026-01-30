@@ -18,9 +18,20 @@ class ExplorerBot(BaseAgent):
         self.terrain_map = {}
         self.target_zone = None
         self.map_sent = False  # Evita enviar el mapa múltiples cops per workflow
+        
+        # Rangs de exploració
+        self.exploration_ranges = [40, 20, 80]
+        self.current_range_index = 0
 
         # Subscripció als missatges importants
         self.message_bus.subscribe(self.on_message)
+
+    def cycle_range(self):
+        """Cicle al següent rang d exploració."""
+        self.current_range_index = (self.current_range_index + 1) % len(self.exploration_ranges)
+        new_range = self.exploration_ranges[self.current_range_index]
+        self.log.info(f"Rang d'exploració canviat a: {new_range}")
+        return new_range
 
     def on_message(self, message):
         """Gestiona missatges rebuts pel bus."""
@@ -46,13 +57,15 @@ class ExplorerBot(BaseAgent):
                 found_zone = None
 
                 from utils.visuals import mark_bot
+                
+                current_range = self.exploration_ranges[self.current_range_index]
 
                 for dx, dz in directions:
                     consecutive_count = 0
                     last_y = None
 
-                    # Recorre 40 blocs en la direcció actual
-                    for i in range(1, 41):
+                    # Recorre 'current_range' blocs en la direcció actual
+                    for i in range(1, current_range + 1):
                         check_x = base_x + (dx * i)
                         check_z = base_z + (dz * i)
                         y = self.mc.getHeight(check_x, check_z)

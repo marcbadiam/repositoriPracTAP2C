@@ -58,6 +58,12 @@ class MinerBot(BaseAgent):
         next_index = (self.current_strategy_index + 1) % len(self.strategies)
         return self.set_strategy(next_index)
 
+    def _release_locks(self):
+        """Allibera bloquejos espacials (anchor_pos)."""
+        if self.anchor_pos:
+            self.log.info(f"Alliberant lock espacial a {self.anchor_pos}")
+            self.anchor_pos = None
+
     def on_message(self, msg):
         """Gestiona missatges rebuts."""
         # Filtrar missatges propis

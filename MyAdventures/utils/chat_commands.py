@@ -133,10 +133,19 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
     # Comanda stop (Atura tots els agents)
     def agent_stop_all(args):
         """Pausa completament tots els agents."""
-        _safe_post("Aturant tots els agents...")
-        for name, agent in agents_dict.items():
-            _safe_post(f"[{name}] Aturat correctament.")
+        _safe_post("Aturant tots els agents i finalitzant workflow...")
 
+        # Resetegem el flag de workflow global
+        if system_flags is not None:
+            system_flags["workflow_mode"] = False
+
+        for name, agent in agents_dict.items():
+            try:
+                agent.stop()
+                _safe_post(f"[{name}] Aturat correctament.")
+            except Exception as e:
+                logger.error(f"Error aturant {name}: {e}")
+                _safe_post(f"[{name}] Error al aturar: {e}")
 
     handler.register("agent stop", agent_stop_all)
 
@@ -185,6 +194,10 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
             # Mode Manual: Desactivem flag de workflow
             if system_flags is not None:
                 system_flags["workflow_mode"] = False
+            
+            # Assegurar que el thread estigui actiu
+            if not explorer._thread or not explorer._thread.is_alive():
+                 explorer.start_loop()
 
             explorer.map_sent = False
             explorer.set_state(AgentState.RUNNING, reason="Comanda usuari (manual)")
@@ -194,6 +207,17 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
 
     handler.register("explorer start", explorer_start)
 
+    def explorer_switch_range(args):
+        """Canvia el rang d'exploració de l'ExplorerBot."""
+        explorer = agents_dict.get("ExplorerBot")
+        if explorer:
+            new_range = explorer.cycle_range()
+            _safe_post(f"[ExplorerBot] Rang canviat a: {new_range} blocs")
+        else:
+            _safe_post("ExplorerBot no trobat")
+
+    handler.register("explorer switchrange", explorer_switch_range)
+
     # Builder commands
     def builder_build(args):
         builder = agents_dict.get("BuilderBot")
@@ -201,6 +225,10 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
             # Mode Manual: Desactivem flag de workflow
             if system_flags is not None:
                 system_flags["workflow_mode"] = False
+            
+            # Assegurar que el thread estigui actiu
+            if not builder._thread or not builder._thread.is_alive():
+                 builder.start_loop()
 
             builder.set_state(AgentState.RUNNING, reason="User command (manual)")
             _safe_post("[BuilderBot] Construcció iniciada (Mode Manual)")
@@ -230,6 +258,10 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
             # Mode Manual: Desactivem flag de workflow
             if system_flags is not None:
                 system_flags["workflow_mode"] = False
+            
+            # Assegurar que el thread estigui actiu
+            if not miner._thread or not miner._thread.is_alive():
+                 miner.start_loop()
 
             miner.start()
             _safe_post("[MinerBot] Mineria iniciada (Mode Manual)")
