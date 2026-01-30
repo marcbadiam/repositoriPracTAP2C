@@ -5,7 +5,6 @@ Utilitza les capacitats de reflexió de Python per descobrir i carregar mòduls 
 
 import importlib
 import inspect
-import os
 import pkgutil
 import logging
 

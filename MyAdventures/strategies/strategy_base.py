@@ -1,6 +1,6 @@
 # Classe base per a estratègies de mineria
 from abc import ABC, abstractmethod
-from typing import Dict, Tuple, Optional, List
+from typing import Dict, Tuple, Optional
 from mcpi import block as mcblock
 import logging
 

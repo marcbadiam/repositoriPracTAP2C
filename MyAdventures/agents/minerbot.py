@@ -2,7 +2,6 @@ from .base_agent import BaseAgent, AgentState
 from utils.communication import MessageProtocol
 from utils.discovery import discover_strategies
 from utils.visuals import mark_bot
-from mcpi import block as mcblock
 import logging
 
 logger = logging.getLogger(__name__)
@@ -51,7 +50,7 @@ class MinerBot(BaseAgent):
             self.log.info(f"Estratègia canviada a l'índex {index}: {strategy_name}")
             return True, strategy_name
         else:
-            self.log.warning(f"Índex d'estratègia invàlid.")
+            self.log.warning("Índex d'estratègia invàlid.")
             return False, None
 
     def cycle_strategy(self):

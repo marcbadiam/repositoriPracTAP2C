@@ -1,6 +1,5 @@
 import unittest
 from unittest.mock import patch, mock_open
-import json
 from utils.functional import (
     parse_log_line,
     load_logs,

@@ -1,6 +1,6 @@
 # Conjunt de proves per descobriment reflexiu
 import unittest
-from utils.discovery import discover_classes, discover_strategies, discover_agents
+from utils.discovery import discover_strategies, discover_agents
 from strategies.strategy_base import MiningStrategy
 from agents.base_agent import BaseAgent
 

@@ -2,7 +2,6 @@
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict
 
 
 class MessageProtocol:
@@ -56,7 +55,7 @@ class MessageBus:
     def subscribe(self, callback):
         if callback not in self.subscribers:
             self.subscribers.append(callback)
-            self.log.debug(f"Subscriptor afegit al MessageBus")
+            self.log.debug("Subscriptor afegit al MessageBus")
 
     def publish(self, msg: dict):
         # Broadcast a tots els subscriptors

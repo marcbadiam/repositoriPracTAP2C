@@ -1,6 +1,6 @@
 # Estratègia de cerca vertical per a mineria
 from .strategy_base import MiningStrategy
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple
 import logging
 
 logger = logging.getLogger(__name__)
@@ -63,7 +63,7 @@ class VerticalSearchStrategy(MiningStrategy):
         # Posem un límit de seguretat de -64 (bedrock) per si de cas
         while current_y >= -64:
             if current_y == 6:
-                logger.info(f"Y=6. Aturant cerca vertical i workflow.")
+                logger.info("Y=6. Aturant cerca vertical i workflow.")
                 self.is_stopped = True
                 break
 

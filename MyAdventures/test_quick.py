@@ -8,8 +8,6 @@ import sys
 import io
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-import json
-from datetime import datetime, timezone
 
 # Test 1: Verificar que tots els imports funcionen
 print("=============")
@@ -21,7 +19,6 @@ try:
 
     print("[OK] BaseAgent")
 
-    from agents.explorerbot import ExplorerBot
 
     print("[OK] ExplorerBot")
 
@@ -41,7 +38,7 @@ try:
 
     print("[OK] Logging")
 
-    from utils.chat_commands import ChatCommandHandler, create_default_handlers
+    from utils.chat_commands import ChatCommandHandler
 
     print("[OK] Chat Commands")
 

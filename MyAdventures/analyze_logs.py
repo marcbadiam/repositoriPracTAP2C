@@ -1,5 +1,4 @@
 import os
-import sys
 from utils.functional import (
     load_logs,
     count_logs_by_level,

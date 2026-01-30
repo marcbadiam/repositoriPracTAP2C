@@ -1,4 +1,4 @@
-from typing import Tuple, Optional
+from typing import Optional
 
 try:
     from mcpi import block as mcblock

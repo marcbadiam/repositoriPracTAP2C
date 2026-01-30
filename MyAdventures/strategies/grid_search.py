@@ -1,6 +1,6 @@
 # Estratègia de cerca en graella per a mineria
 from .strategy_base import MiningStrategy
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple
 import logging
 import time
 

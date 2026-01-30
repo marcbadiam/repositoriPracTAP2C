@@ -6,7 +6,6 @@ Manté el sistema obert i respon a comandes de xat.
 import time
 import logging
 import threading
-from agents.base_agent import AgentState
 from utils.communication import MessageBus
 from utils.discovery import discover_agents
 from utils.logging_config import setup_logging

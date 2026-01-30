@@ -1,5 +1,5 @@
 import unittest
-from utils.chat_commands import ChatCommandHandler, ChatCommand, create_default_handlers
+from utils.chat_commands import ChatCommandHandler, create_default_handlers
 from agents.base_agent import BaseAgent, AgentState
 
 
