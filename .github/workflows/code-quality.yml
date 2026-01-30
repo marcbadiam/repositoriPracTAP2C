@@ -34,7 +34,7 @@ jobs:
           python -m flake8 . --count --exit-zero \
             --max-line-length=127 \
             --statistics \
-            --ignore=C901,E741 \
+            --ignore=C901,E741,W503,W504 \
             --exclude=mcpi,__pycache__,.git
 
       - name: Check code formatting with black
