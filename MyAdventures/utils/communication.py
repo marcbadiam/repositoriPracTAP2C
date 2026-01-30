@@ -4,9 +4,17 @@ import logging
 from datetime import datetime
 from typing import Any, Dict
 
+
 class MessageProtocol:
     @staticmethod
-    def create_message(msg_type: str, source: str, target: str, payload: dict, status: str = "SUCCESS", context: dict = None) -> dict:
+    def create_message(
+        msg_type: str,
+        source: str,
+        target: str,
+        payload: dict,
+        status: str = "SUCCESS",
+        context: dict = None,
+    ) -> dict:
         return {
             "type": msg_type,
             "source": source,
@@ -14,13 +22,21 @@ class MessageProtocol:
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "payload": payload,
             "status": status,
-            "context": context or {}
+            "context": context or {},
         }
 
     @staticmethod
     def validate_message(msg: dict) -> bool:
         # Validació mínima segons specs.md
-        required = ["type", "source", "target", "timestamp", "payload", "status", "context"]
+        required = [
+            "type",
+            "source",
+            "target",
+            "timestamp",
+            "payload",
+            "status",
+            "context",
+        ]
         return all(k in msg for k in required)
 
     @staticmethod
@@ -30,6 +46,7 @@ class MessageProtocol:
     @staticmethod
     def from_json(msg_str: str) -> dict:
         return json.loads(msg_str)
+
 
 class MessageBus:
     def __init__(self):
@@ -46,7 +63,7 @@ class MessageBus:
         msg_type = msg.get("type", "unknown")
         target = msg.get("target", "all")
         self.log.debug(f"Broadcasting missatge {msg_type} (target: {target})")
-        
+
         for callback in self.subscribers:
             try:
                 callback(msg)

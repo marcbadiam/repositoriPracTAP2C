@@ -6,9 +6,10 @@ from utils.validators import es_fila_valida
 
 logger = logging.getLogger(__name__)
 
+
 class BuildPlan(ABC):
     """Classe base per a tots els plans de construcció."""
-    
+
     @property
     @abstractmethod
     def name(self):
@@ -30,13 +31,13 @@ class BuildPlan(ABC):
         """Mètode d'ajuda per carregar plans des de CSV."""
 
         csv_path = os.path.join("data", "plans", filename)
-        
+
         def to_absolute_block(row):
             dx, dy, dz = int(row["dx"]), int(row["dy"]), int(row["dz"])
             material = row["material"]
             return (x + dx, y + dy, z + dz, material)
 
-        with open(csv_path, mode='r', newline='') as f:
+        with open(csv_path, mode="r", newline="") as f:
             reader = csv.DictReader(f)
             valid_rows = filter(es_fila_valida, reader)
             return list(map(to_absolute_block, valid_rows))

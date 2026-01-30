@@ -7,22 +7,22 @@ import threading
 
 
 class AgentState(Enum):
-    IDLE = auto()     # Estat d'espera inicial o inactiu
+    IDLE = auto()  # Estat d'espera inicial o inactiu
     RUNNING = auto()  # Agent executant-se activament
-    PAUSED = auto()   # Agent pausat temporalment
+    PAUSED = auto()  # Agent pausat temporalment
     WAITING = auto()  # Esperant una condició externa
     STOPPED = auto()  # Aturat permanentment
-    ERROR = auto()    # S'ha produït un error 
+    ERROR = auto()  # S'ha produït un error
 
 
 class BaseAgent(ABC):
     """Classe base abstracta per a tots els agents."""
-    
+
     def __init__(self, name, system_flags=None):
         # Inicialitza l'agent amb un nom i configura el logger
         self.name = name
         self.state = AgentState.IDLE
-        self.log = logging.getLogger(self.name) # Logger específic per a l'agent
+        self.log = logging.getLogger(self.name)  # Logger específic per a l'agent
         self.checkpoint = {}  # Per guardar l'estat en pausa o repòs
         self.system_flags = system_flags if system_flags is not None else {}
         self.log.info(f"{self.name} inicialitzat en estat {self.state.name}")
@@ -31,25 +31,27 @@ class BaseAgent(ABC):
         self._tick_interval = 0.2
         self.wait_quietly = False
 
-    def set_state(self, new_state, reason=""):  
+    def set_state(self, new_state, reason=""):
         """Canvia l'estat de l'agent amb registre de transició."""
         old_state = self.state
-        self.state = new_state # Actualització de l'estat
+        self.state = new_state  # Actualització de l'estat
         timestamp = datetime.now(timezone.utc).isoformat()
-        
+
         log_entry = {
             "agent": self.name,
             "timestamp": timestamp,
-            "from_state": old_state.name, # Registre de l'estat anterior
-            "to_state": new_state.name,   # Registre del nou estat
-            "reason": reason              # Motiu del canvi
+            "from_state": old_state.name,  # Registre de l'estat anterior
+            "to_state": new_state.name,  # Registre del nou estat
+            "reason": reason,  # Motiu del canvi
         }
         self.log.debug(f"Transició d'estat: {json.dumps(log_entry)}")
-        self.log.info(f"[STATE TRANSITION] {old_state.name} -> {new_state.name} ({reason})")
+        self.log.info(
+            f"[STATE TRANSITION] {old_state.name} -> {new_state.name} ({reason})"
+        )
         self.log.debug(f"Transició estructurada: {json.dumps(log_entry)}")
-        
+
         if new_state in (AgentState.STOPPED, AgentState.ERROR):
-            self._release_locks() # Alliberar recursos si l'agent s'atura
+            self._release_locks()  # Alliberar recursos si l'agent s'atura
             self._stop_event.set()
 
     def _release_locks(self):
@@ -59,7 +61,7 @@ class BaseAgent(ABC):
         # Guarda l'estat actual per poder recuperar-lo més tard
         self.checkpoint = {
             "state": self.state.name,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         self.log.debug(f"Checkpoint guardat: {self.checkpoint}")
 
@@ -73,12 +75,11 @@ class BaseAgent(ABC):
     def handle_command(self, command: str, args: dict):
         """Gestiona les comandes de control (pausa, reprendre, aturar, actualitzar)."""
         if hasattr(self, command):
-                method_to_call = getattr(self, command)
-                method_to_call()
-                self.log.info(f"Comanda '{command}' executada a {self.name}")
+            method_to_call = getattr(self, command)
+            method_to_call()
+            self.log.info(f"Comanda '{command}' executada a {self.name}")
         else:
             self.log.warning(f"Comanda desconeguda '{command}' per a {self.name}")
-
 
     @abstractmethod
     def perceive(self):
@@ -103,8 +104,6 @@ class BaseAgent(ABC):
         self.perceive()
         self.decide()
         self.act()
-
-
 
     # Thread-based execution
     def start_loop(self, tick_interval: float = 0.2):

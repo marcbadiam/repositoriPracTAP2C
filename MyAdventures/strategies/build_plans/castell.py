@@ -1,5 +1,6 @@
 from .base_plan import BuildPlan
 
+
 class CastellPlan(BuildPlan):
     @property
     def name(self):

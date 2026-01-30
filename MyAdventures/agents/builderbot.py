@@ -8,21 +8,23 @@ from utils.discovery import discover_build_plans
 
 logger = logging.getLogger(__name__)
 
+
 class BuilderBot(BaseAgent):
     """Agent que construeix qualsevol dels planols generats."""
+
     def __init__(self, name, message_bus, mc, mc_lock=None, system_flags=None):
         super().__init__(name, system_flags)
         self.message_bus = message_bus
         self.mc = mc
         self.mc_lock = mc_lock
-        
+
         # Carreguem els plans dinamicament
         self.plans = {}
         self._load_plans()
-        
+
         self.current_plan_name = next(iter(self.plans)) if self.plans else None
         self.current_plan = self.plans.get(self.current_plan_name)
-        
+
         self.bom = self.current_plan.bom
 
         self.inventory = {"dirt": 0, "stone": 0, "sandstone": 0}
@@ -51,15 +53,15 @@ class BuilderBot(BaseAgent):
         if plan_name not in self.plans:
             self.log.error(f"Pla desconegut: {plan_name}")
             return False
-        
+
         self.current_plan_name = plan_name
         self.current_plan = self.plans[plan_name]
         self.bom = self.current_plan.bom
-       
+
         for mat in self.bom:
             if mat not in self.inventory:
                 self.inventory[mat] = 0
-                
+
         self.log.info(f"Pla canviat a '{plan_name}'. Nous requisits: {self.bom}")
         return True
 
@@ -71,7 +73,7 @@ class BuilderBot(BaseAgent):
             next_index = (current_index + 1) % len(plan_names)
         except ValueError:
             next_index = 0
-            
+
         next_plan_name = plan_names[next_index]
         self.switch_plan(next_plan_name)
         return next_plan_name, self.plans[next_plan_name].bom
@@ -84,7 +86,7 @@ class BuilderBot(BaseAgent):
 
         msg_type = msg.get("type")
         target = msg.get("target")
-        
+
         # Acceptar missatges específics
         if target and target not in ["all", self.name] and msg_type != "workflow.reset":
             return
@@ -99,22 +101,27 @@ class BuilderBot(BaseAgent):
     def _handle_map_v1(self, msg):
         self.target_zone = msg.get("payload", {}).get("zone")
         self.log.info(f"Nova zona de construcció rebuda: {self.target_zone}")
-        
+
         # Reseteja l'estat del builder per a la nova tasca
         self.build_plan = []
         self.build_index = 0
-        
+
         # Comprova el flag del workflow
         if self.system_flags.get("workflow_mode", False):
-            self.set_state(AgentState.WAITING, "Zona rebuda, esperant materials (Workflow)")
+            self.set_state(
+                AgentState.WAITING, "Zona rebuda, esperant materials (Workflow)"
+            )
             self._request_materials()
         else:
-            self.set_state(AgentState.WAITING, "Zona rebuda (Manual). Esperant comanda -builder build.")
+            self.set_state(
+                AgentState.WAITING,
+                "Zona rebuda (Manual). Esperant comanda -builder build.",
+            )
             self.log.info("Mode Manual: No es demanen materials automàticament.")
 
     def _handle_inventory_v1(self, msg):
         received_inventory = msg.get("payload", {}).get("inventory", {})
-        
+
         for k, v in received_inventory.items():
             self.inventory[k] = v
         self.log.info(f"Inventari actualitzat: {self.inventory}")
@@ -128,7 +135,7 @@ class BuilderBot(BaseAgent):
                 msg_type="materials.requirements.v1",
                 source=self.name,
                 target="MinerBot",
-                payload={"needs": self.bom}
+                payload={"needs": self.bom},
             )
             self.message_bus.publish(msg)
             self.log.info(f"Petició de materials enviada: {self.bom}")
@@ -140,10 +147,14 @@ class BuilderBot(BaseAgent):
             if all(self.inventory.get(k, 0) >= v for k, v in self.bom.items()):
                 # Nomes auto-start si esta en mode workflow
                 if self.system_flags.get("workflow_mode", False):
-                    self.log.info("Materials suficients. Iniciant construcció (Workflow).")
+                    self.log.info(
+                        "Materials suficients. Iniciant construcció (Workflow)."
+                    )
                     self.set_state(AgentState.RUNNING, "Materials disponibles")
                 else:
-                    self.log.info("Materials suficients. Esperant comanda -builder build (Manual).")
+                    self.log.info(
+                        "Materials suficients. Esperant comanda -builder build (Manual)."
+                    )
             else:
                 # Nomes auto-retry si esta en mode workflow
                 if self.system_flags.get("workflow_mode", False):
@@ -177,53 +188,61 @@ class BuilderBot(BaseAgent):
         """Crea el pla de construcció basat en el pla seleccionat."""
         if not self.target_zone:
             return
-        
-        x, y, z = self.target_zone['x'], self.target_zone['y'], self.target_zone['z']
-        
-        if self.mc_lock: self.mc_lock.acquire()
+
+        x, y, z = self.target_zone["x"], self.target_zone["y"], self.target_zone["z"]
+
+        if self.mc_lock:
+            self.mc_lock.acquire()
         try:
             mark_bot(self.mc, x, y + 5, z, wool_color=5, label=self.name)
         finally:
-            if self.mc_lock: self.mc_lock.release()
+            if self.mc_lock:
+                self.mc_lock.release()
 
-        
         if not self.current_plan:
             self.log.error("No hi ha cap pla seleccionat!")
             return
 
         self.build_plan = self.current_plan.generate(x, y, z)
-        
-        self.log.info(f"Pla de construcció '{self.current_plan_name}' creat amb {len(self.build_plan)} blocs.")
-        self.build_index = 0
 
+        self.log.info(
+            f"Pla de construcció '{self.current_plan_name}' creat amb {len(self.build_plan)} blocs."
+        )
+        self.build_index = 0
 
     def _build_next_block(self):
         """Construeix el següent bloc del pla."""
         bx, by, bz, material = self.build_plan[self.build_index]
-        
+
         if self.inventory.get(material, 0) > 0:
-            if self.mc_lock: self.mc_lock.acquire()
+            if self.mc_lock:
+                self.mc_lock.acquire()
             try:
                 block_id = mcblock.DIRT.id
                 if material == "stone":
                     block_id = mcblock.STONE.id
                 elif material == "sandstone":
                     block_id = mcblock.SANDSTONE.id
-                    
+
                 self.mc.setBlock(bx, by, bz, block_id)
             finally:
-                if self.mc_lock: self.mc_lock.release()
+                if self.mc_lock:
+                    self.mc_lock.release()
 
             self.inventory[material] -= 1
-            self.log.debug(f"Bloc de {material} col·locat a ({bx},{by},{bz}). Restants: {self.inventory[material]}")
-            
+            self.log.debug(
+                f"Bloc de {material} col·locat a ({bx},{by},{bz}). Restants: {self.inventory[material]}"
+            )
+
             # Publicar progrés
             progress_msg = MessageProtocol.create_message(
-                "build.v1", self.name, "Monitor", 
-                {"progress": (self.build_index + 1) / len(self.build_plan) * 100}
+                "build.v1",
+                self.name,
+                "Monitor",
+                {"progress": (self.build_index + 1) / len(self.build_plan) * 100},
             )
             self.message_bus.publish(progress_msg)
-            
+
             self.build_index += 1
         else:
             self.log.warning(f"Material insuficient '{material}'. Pausant construcció.")
@@ -233,12 +252,16 @@ class BuilderBot(BaseAgent):
     def _finalize_build(self):
         """Finalitza el procés de construcció."""
         self.log.info(f"Construcció completada a la zona {self.target_zone}")
-        
+
         # Notificar finalització
-        complete_msg = MessageProtocol.create_message("build.complete.v1", self.name, "MinerBot", {})
+        complete_msg = MessageProtocol.create_message(
+            "build.complete.v1", self.name, "MinerBot", {}
+        )
         self.message_bus.publish(complete_msg)
-        
-        self.set_state(AgentState.WAITING, "Construcció completada, esperant nova tasca")
+
+        self.set_state(
+            AgentState.WAITING, "Construcció completada, esperant nova tasca"
+        )
         # No resetejem l'estat intern aquí per si es vol inspeccionar
 
     def reset(self):
@@ -249,7 +272,7 @@ class BuilderBot(BaseAgent):
             self.bom = self.current_plan.bom
             self.inventory = {k: 0 for k in self.bom}
         else:
-             self.inventory = {}
+            self.inventory = {}
         self.target_zone = None
         self.build_plan = []
         self.build_index = 0

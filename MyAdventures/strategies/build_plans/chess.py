@@ -1,5 +1,6 @@
 from .base_plan import BuildPlan
 
+
 class ChessPlan(BuildPlan):
     @property
     def name(self):
