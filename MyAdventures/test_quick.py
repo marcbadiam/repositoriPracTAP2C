@@ -19,7 +19,6 @@ try:
 
     print("[OK] BaseAgent")
 
-
     print("[OK] ExplorerBot")
 
     from agents.minerbot import MinerBot

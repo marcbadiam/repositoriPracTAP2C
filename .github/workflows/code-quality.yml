@@ -2,9 +2,9 @@ name: Code Quality
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: [main]
   pull_request:
-    branches: [main, master, develop]
+    branches: [main]
 
 permissions:
   contents: read
@@ -30,12 +30,12 @@ jobs:
       - name: Lint with flake8
         run: |
           cd MyAdventures
-          python -m flake8 . --count --select=E9,F63,F7,F82 \
-            --show-source --statistics \
-            --exclude=mcpi,__pycache__,.git
+          python -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=mcpi,__pycache__,.git
           python -m flake8 . --count --exit-zero \
-            --max-complexity=10 --max-line-length=127 \
-            --statistics --exclude=mcpi,__pycache__,.git
+            --max-line-length=127 \
+            --statistics \
+            --ignore=C901,E741,F841 \
+            --exclude=mcpi,__pycache__,.git
 
       - name: Check code formatting with black
         run: |

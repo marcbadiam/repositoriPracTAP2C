@@ -166,9 +166,6 @@ class MinerBot(BaseAgent):
 
         strategy = self.strategies[self.current_strategy_index]
 
-        # Capturar inventari abans de minar per detectar progrés
-        before_inventory = self.inventory.copy()
-
         # Bloc a bloc i no bloquejem per tota l'estratègia
         collected = strategy.mine(
             self.mc,
