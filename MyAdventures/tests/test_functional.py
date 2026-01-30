@@ -1,116 +1,86 @@
-# Conjunt de proves per utilitats de programació funcional
 import unittest
+from unittest.mock import patch, mock_open
+import json
 from utils.functional import (
-    find_flat_zones,
-    calculate_total_resources,
-    extract_elevations,
-    calculate_terrain_stats,
-    summarize_mining_results,
-    compose,
-    filter_by_resource
+    parse_log_line,
+    load_logs,
+    filter_logs,
+    count_logs_by_level,
+    get_agent_activity
 )
 
+class TestFunctionalLogAnalysis(unittest.TestCase):
+    """Test de les utilitats de programació funcional per anàlisi de logs."""
+    
+    def test_parse_log_line_valid(self):
+        """Prova el parseig de línies de log vàlides."""
+        line = '{"level": "INFO", "message": "Test"}'
+        result = parse_log_line(line)
+        self.assertEqual(result["level"], "INFO")
+        self.assertEqual(result["message"], "Test")
+        
+    def test_parse_log_line_invalid(self):
+        """Prova la gestió d'errors amb línies malformades."""
+        line = 'INVALID JSON'
+        result = parse_log_line(line)
+        self.assertEqual(result["level"], "ERROR")
+        self.assertEqual(result["message"], "Log line malformed")
 
-class TestFunctionalUtilities(unittest.TestCase):
-    """Prova les utilitats de programació funcional."""
-    
-    def test_find_flat_zones(self):
-        """Prova el filtratge de zones planes."""
-        terrain = [
-            {"x": 0, "z": 0, "elevation": 10, "variance": 1.0},
-            {"x": 1, "z": 0, "elevation": 15, "variance": 5.0},
-            {"x": 2, "z": 0, "elevation": 11, "variance": 1.5}
-        ]
+    @patch("os.path.exists")
+    @patch("builtins.open", new_callable=mock_open, read_data='{"level": "INFO"}\n{"level": "ERROR"}')
+    def test_load_logs(self, mock_file, mock_exists):
+        """Prova de carrega de logs (lazy)"""
+        mock_exists.return_value = True
         
-        flat_zones = find_flat_zones(terrain, max_variance=2.0)
-        self.assertEqual(len(flat_zones), 2)
-    
-    def test_calculate_total_resources(self):
-        """Prova l'agregació de recursos utilitzant reduce."""
-        inventories = [
-            {"iron": 5, "wood": 10},
-            {"iron": 3, "stone": 7},
-            {"wood": 5, "stone": 3}
-        ]
+        logs_gen = load_logs("dummy.log")
+        logs = list(logs_gen)
         
-        total = calculate_total_resources(inventories)
-        
-        self.assertEqual(total["iron"], 8)
-        self.assertEqual(total["wood"], 15)
-        self.assertEqual(total["stone"], 10)
-    
-    def test_extract_elevations(self):
-        """Prova l'extracció d'elevacions utilitzant map."""
-        terrain = [
-            {"x": 0, "z": 0, "elevation": 10},
-            {"x": 1, "z": 0, "elevation": 15},
-            {"x": 2, "z": 0, "elevation": 11}
-        ]
-        
-        elevations = extract_elevations(terrain)
-        
-        self.assertEqual(elevations, [10, 15, 11])
-    
-    def test_calculate_terrain_stats(self):
-        """Prova el càlcul complet d'estadístiques de terreny."""
-        terrain = [
-            {"x": 0, "z": 0, "elevation": 10, "variance": 1.0},
-            {"x": 1, "z": 0, "elevation": 15, "variance": 1.5},
-            {"x": 2, "z": 0, "elevation": 11, "variance": 1.2}
-        ]
-        
-        stats = calculate_terrain_stats(terrain)
-        
-        self.assertEqual(stats["count"], 3)
-        self.assertAlmostEqual(stats["avg_elevation"], 12.0)
-        self.assertEqual(stats["min_elevation"], 10)
-        self.assertEqual(stats["max_elevation"], 15)
-    
-    def test_summarize_mining_results(self):
-        """Prova el resum de resultats de mineria."""
-        sessions = [
-            {"session_id": 1, "inventory": {"iron": 5, "wood": 10}},
-            {"session_id": 2, "inventory": {"stone": 7}},
-            {"session_id": 3, "inventory": {}}
-        ]
-        
-        summary = summarize_mining_results(sessions)
-        
-        self.assertEqual(summary["total_sessions"], 3)
-        self.assertEqual(summary["successful_sessions"], 2)
-        self.assertEqual(summary["total_resources"]["iron"], 5)
-        self.assertAlmostEqual(summary["success_rate"], 2/3)
-    
-    def test_compose_functions(self):
-        """Prova la composició de funcions."""
-        add_one = lambda x: x + 1
-        multiply_two = lambda x: x * 2
-        
-        composed = compose(multiply_two, add_one)
-        result = composed(5)  # (5 + 1) * 2 = 12
-        
-        self.assertEqual(result, 12)
-    
-    def test_filter_by_resource(self):
-        """Prova la funció de filtre d'ordre superior."""
-        inventories = [
-            {"iron": 5, "wood": 10},
-            {"stone": 7},
-            {"iron": 3, "stone": 2}
-        ]
-        
-        has_iron = filter_by_resource("iron")
-        iron_inventories = list(filter(has_iron, inventories))
-        
-        self.assertEqual(len(iron_inventories), 2)
-    
-    def test_empty_terrain_data(self):
-        """Prova la gestió de dades de terreny buides."""
-        stats = calculate_terrain_stats([])
-        
-        self.assertEqual(stats["count"], 0)
-        self.assertEqual(stats["avg_elevation"], 0)
+        self.assertEqual(len(logs), 2)
+        self.assertEqual(logs[0]["level"], "INFO")
+        self.assertEqual(logs[1]["level"], "ERROR")
 
+    def test_filter_logs(self):
+        """Prova el filter de logs."""
+        data = [
+            {"level": "INFO", "logger": "Bot1"},
+            {"level": "ERROR", "logger": "Bot1"},
+            {"level": "INFO", "logger": "Bot2"}
+        ]
+        
+        # Filter de INFO
+        infos = list(filter_logs(data, level="INFO"))
+        self.assertEqual(len(infos), 2)
+        
+        # Filter de Bot1 i INFO
+        bot1_infos = list(filter_logs(data, level="INFO", logger="Bot1"))
+        self.assertEqual(len(bot1_infos), 1)
+        self.assertEqual(bot1_infos[0]["logger"], "Bot1")
+
+    def test_count_logs_by_level(self):
+        """Prova el recompte utilitzant reduce."""
+        data = [
+            {"level": "INFO"},
+            {"level": "INFO"},
+            {"level": "ERROR"},
+            {"level": "DEBUG"}
+        ]
+        
+        counts = count_logs_by_level(data)
+        self.assertEqual(counts["INFO"], 2)
+        self.assertEqual(counts["ERROR"], 1)
+        self.assertEqual(counts["DEBUG"], 1)
+
+    def test_get_agent_activity(self):
+        """Prova nLogs per agent."""
+        data = [
+            {"logger": "ExplorerBot"},
+            {"logger": "MinerBot"},
+            {"logger": "ExplorerBot"}
+        ]
+        
+        activity = get_agent_activity(data)
+        self.assertEqual(activity["ExplorerBot"], 2)
+        self.assertEqual(activity["MinerBot"], 1)
 
 if __name__ == "__main__":
     unittest.main()

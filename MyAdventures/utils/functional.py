@@ -1,184 +1,73 @@
 """
-Utilitats de programació funcional per a transformació i agregació de dades.
-Demostra l'ús de decoradors, map, filter, reduce, i funcions d'ordre superior.
+Utilitats de programació funcional per a l'anàlisi de logs.
 """
-from functools import reduce, wraps
+from functools import reduce
 import logging
-from typing import Callable, List, Dict, Any
+import json
+import os
+from typing import Dict, Any, Iterator, Iterable
 
 logger = logging.getLogger(__name__)
 
-
-# Exemples de decoradors
-def log_execution(func: Callable) -> Callable:
+# parse
+def parse_log_line(line: str) -> Dict[str, Any]:
     """
-    Decorador que registra l'execució de funcions.
-    Exemple del paradigma de programació funcional.
+    Parseja una línia de log en format JSON.
+    Gestionem errors amb try-except.
     """
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        logger.debug(f"Executant {func.__name__} amb args={args}, kwargs={kwargs}")
-        result = func(*args, **kwargs)
-        logger.debug(f"{func.__name__} ha retornat {result}")
-        return result
-    return wrapper
+    try:
+        return json.loads(line)
+    except json.JSONDecodeError:
+        return {"level": "ERROR", "message": "Log line malformed", "raw": line}
 
-
-def validate_terrain_data(func: Callable) -> Callable:
+# map
+def load_logs(file_path: str) -> Iterator[Dict[str, Any]]:
     """
-    Decorador que valida les dades del terreny abans del processament.
+    Generador que llegeix logs d'un fitxer línia per línia (lazy).
+    Això és eficient ja que podem tenir molts logs.
     """
-    @wraps(func)
-    def wrapper(terrain_data, *args, **kwargs):
-        if not terrain_data:
-            logger.warning(f"{func.__name__}: Dades de terreny buides")
-            return []
-        if not isinstance(terrain_data, (list, dict)):
-            logger.error(f"{func.__name__}: Tipus de dades de terreny no vàlid")
-            return []
-        return func(terrain_data, *args, **kwargs)
-    return wrapper
-
-
-# Funcions d'ordre superior per a anàlisi de terreny
-@log_execution
-@validate_terrain_data
-def find_flat_zones(terrain_data: List[Dict], max_variance: float = 2.0) -> List[Dict]:
-    """
-    Cercar zones planes en dades de terreny usant filter.
-    
-    Args:
-        terrain_data: Llista de punts de terreny amb dades d'elevació
-        max_variance: Variació d'elevació màxima permesa
+    if not os.path.exists(file_path):
+        logger.error(f"El fitxer {file_path} no existeix.")
+        return
         
-    Returns:
-        Llista de zones planes
-    """
-    def is_flat(zone):
-        if 'variance' in zone:
-            return zone['variance'] <= max_variance
-        if 'elevation' in zone:
-            return True 
-        return False
-    
-    return list(filter(is_flat, terrain_data))
+    with open(file_path, 'r', encoding='utf-8') as f:
+        # Map: Transformar cada línia de text en un dict
+        yield from map(parse_log_line, f)
 
+# filter
+def filter_logs(logs: Iterable[Dict], **criteria) -> Iterator[Dict]:
+    """
+    Filtra els logs basant-se en criteris clau-valor.
+    Exemple: filter_logs(logs, level="ERROR", logger="MinerBot")
+    """
+    def match_criteria(log_entry):
+        for key, value in criteria.items():
+            if log_entry.get(key) != value:
+                return False
+        return True
 
-@log_execution
-def calculate_total_resources(inventories: List[Dict[str, int]]) -> Dict[str, int]:
+    return filter(match_criteria, logs)
+
+# reduce
+def count_logs_by_level(logs: Iterable[Dict]) -> Dict[str, int]:
     """
-    Calcular recursos totals a través de múltiples inventaris usant reduce.
-    
-    Args:
-        inventories: Llista de diccionaris d'inventari
-        
-    Returns:
-        Dict amb comptes de recursos agregats
+    Compta quants logs hi ha de cada nivell usant reduce.
     """
-    def merge_inventories(acc, inventory):
-        for resource, count in inventory.items():
-            acc[resource] = acc.get(resource, 0) + count
+    def reducer(acc, log):
+        level = log.get("level", "UNKNOWN")
+        acc[level] = acc.get(level, 0) + 1
         return acc
-    
-    return reduce(merge_inventories, inventories, {})
 
+    return reduce(reducer, logs, {})
 
-@log_execution
-def extract_elevations(terrain_data: List[Dict]) -> List[float]:
+# reduce
+def get_agent_activity(logs: Iterable[Dict]) -> Dict[str, int]:
     """
-    Extreure valors d'elevació usant map.
-    
-    Args:
-        terrain_data: Llista de punts de terreny
+    Analitza l'activitat per logger amb reduce.
+    """
+    def reducer(acc, log):
+        agent = log.get("logger", "Unknown")
+        acc[agent] = acc.get(agent, 0) + 1
+        return acc
         
-    Returns:
-        Llista de valors d'elevació
-    """
-    return list(map(lambda point: point.get('elevation', 0), terrain_data))
-
-
-@log_execution
-def calculate_terrain_stats(terrain_data: List[Dict]) -> Dict[str, Any]:
-    """
-    Calcular estadístiques comprehensives del terreny usant composició funcional.
-    
-    Args:
-        terrain_data: Llista de punts de terreny
-        
-    Returns:
-        Dict amb estadístiques del terreny
-    """
-    if not terrain_data:
-        return {
-            "count": 0,
-            "avg_elevation": 0,
-            "min_elevation": 0,
-            "max_elevation": 0,
-            "flat_zones": []
-        }
-    
-    elevations = extract_elevations(terrain_data)
-    
-    return {
-        "count": len(elevations),
-        "avg_elevation": sum(elevations) / len(elevations) if elevations else 0,
-        "min_elevation": min(elevations) if elevations else 0,
-        "max_elevation": max(elevations) if elevations else 0,
-        "flat_zones": find_flat_zones(terrain_data)
-    }
-
-
-def compose(*functions):
-    """
-    Composar múltiples funcions en una sola funció (de dreta a esquerra).
-    Exemple: compose(f, g, h)(x) = f(g(h(x)))
-    """
-    def inner(arg):
-        for func in reversed(functions):
-            arg = func(arg)
-        return arg
-    return inner
-
-
-def filter_by_resource(resource_type: str) -> Callable:
-    """
-    Funció d'ordre superior que retorna una funció filter per a recurs específic.
-    
-    Args:
-        resource_type: Tipus de recurs a filtrar
-        
-    Returns:
-        Funció filter
-    """
-    def filter_func(inventory: Dict[str, int]) -> bool:
-        return resource_type in inventory and inventory[resource_type] > 0
-    
-    return filter_func
-
-
-@log_execution
-def summarize_mining_results(mining_sessions: List[Dict]) -> Dict[str, Any]:
-    """
-    Resumir resultats de mineria usant patró map/filter/reduce.
-    
-    Args:
-        mining_sessions: Llista de dades de sessió de mineria
-        
-    Returns:
-        Estadístiques de resum
-    """
-    # Extreure inventaris
-    inventories = list(map(lambda s: s.get('inventory', {}), mining_sessions))
-    
-    # Calcular totals
-    total_resources = calculate_total_resources(inventories)
-    
-    # Cercar sessions exitoses (aquelles amb recursos)
-    successful = list(filter(lambda inv: sum(inv.values()) > 0, inventories))
-    
-    return {
-        "total_sessions": len(mining_sessions),
-        "successful_sessions": len(successful),
-        "total_resources": total_resources,
-        "success_rate": len(successful) / len(mining_sessions) if mining_sessions else 0
-    }
+    return reduce(reducer, logs, {})

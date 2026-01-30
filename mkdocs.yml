@@ -15,12 +15,7 @@ nav:
       - Strategy Base: strategies/strategy_base.md
       - Grid Search: strategies/grid_search.md
       - Vertical Search: strategies/vertical_search.md
-      - Build Plans:
-          - Overview: strategies/build_plans/index.md
-          - Base Plan: strategies/build_plans/base_plan.md
-          - Castell: strategies/build_plans/castell.md
-          - Chess: strategies/build_plans/chess.md
-          - Plataforma: strategies/build_plans/plataforma.md
+
   - Utils:
       - Overview: utils/index.md
       - Chat Commands: utils/chat_commands.md
