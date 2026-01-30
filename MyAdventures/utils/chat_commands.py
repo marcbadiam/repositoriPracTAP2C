@@ -124,10 +124,21 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
 
     # Comanda status
     def status_command(args):
+        _safe_post("=== ESTAT DELS AGENTS ===")
         for name, agent in agents_dict.items():
             _safe_post(f"{name}: {agent.state.name}")
 
     handler.register("agent status", status_command)
+
+    # Comanda stop (Atura tots els agents)
+    def agent_stop_all(args):
+        """Pausa completament tots els agents."""
+        _safe_post("Aturant tots els agents...")
+        for name, agent in agents_dict.items():
+            _safe_post(f"[{name}] Aturat correctament.")
+
+
+    handler.register("agent stop", agent_stop_all)
 
     def agent_pause_all(args):
         """Pausa qualsevol agent que estigui executant-se."""

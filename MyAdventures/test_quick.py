@@ -160,6 +160,9 @@ try:
     bus = MessageBus()
     builder = BuilderBot("TestBuilder", bus, None)
 
+    # Select specific plan for test
+    builder.switch_plan("plataforma")
+    
     # Verificar BOM
     assert builder.bom == {"dirt": 8, "stone": 8}
     print("[OK] BOM correcte: 8 terra + 8 pedra")
