@@ -194,10 +194,10 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
             # Mode Manual: Desactivem flag de workflow
             if system_flags is not None:
                 system_flags["workflow_mode"] = False
-            
+
             # Assegurar que el thread estigui actiu
             if not explorer._thread or not explorer._thread.is_alive():
-                 explorer.start_loop()
+                explorer.start_loop()
 
             explorer.map_sent = False
             explorer.set_state(AgentState.RUNNING, reason="Comanda usuari (manual)")
@@ -225,10 +225,10 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
             # Mode Manual: Desactivem flag de workflow
             if system_flags is not None:
                 system_flags["workflow_mode"] = False
-            
+
             # Assegurar que el thread estigui actiu
             if not builder._thread or not builder._thread.is_alive():
-                 builder.start_loop()
+                builder.start_loop()
 
             builder.set_state(AgentState.RUNNING, reason="User command (manual)")
             _safe_post("[BuilderBot] Construcció iniciada (Mode Manual)")
@@ -258,10 +258,10 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
             # Mode Manual: Desactivem flag de workflow
             if system_flags is not None:
                 system_flags["workflow_mode"] = False
-            
+
             # Assegurar que el thread estigui actiu
             if not miner._thread or not miner._thread.is_alive():
-                 miner.start_loop()
+                miner.start_loop()
 
             miner.start()
             _safe_post("[MinerBot] Mineria iniciada (Mode Manual)")

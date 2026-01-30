@@ -15,6 +15,7 @@ nav:
       - Strategy Base: strategies/strategy_base.md
       - Grid Search: strategies/grid_search.md
       - Vertical Search: strategies/vertical_search.md
+      - Build plans: strategies/build_plans/index.md
 
   - Utils:
       - Overview: utils/index.md

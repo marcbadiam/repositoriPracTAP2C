@@ -1,0 +1,3 @@
+# Discovery
+
+::: MyAdventures.utils.discovery

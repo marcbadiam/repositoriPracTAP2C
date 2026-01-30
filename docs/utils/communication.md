@@ -1,0 +1,3 @@
+# Communication
+
+::: MyAdventures.utils.communication
