@@ -32,6 +32,7 @@ def main():
     parser.add_argument("--workflow", action="store_true", help="Executa en mode workflow automàtic (subprocess)")
     parser.add_argument("--miner-strategy", type=str, help="Nom de l'estratègia de mineria a utilitzar")
     parser.add_argument("--builder-plan", type=str, help="Nom del pla de construcció a utilitzar")
+    parser.add_argument("--explorer-range", type=int, help="Rang d'exploració per a ExplorerBot")
     args = parser.parse_args()
 
     setup_logging()
@@ -96,6 +97,15 @@ def main():
                     logger.info(f"WORKFLOW CONFIG: BuilderBot pla: {args.builder_plan}")
                 else:
                     logger.error(f"WORKFLOW CONFIG: No s'ha pogut posar el pla {args.builder_plan}")
+
+        # Configurar Explorer
+        if args.explorer_range:
+            explorer_agent = agents_dict.get("ExplorerBot")
+            if explorer_agent:
+                if explorer_agent.set_range(args.explorer_range):
+                    logger.info(f"WORKFLOW CONFIG: ExplorerBot rang: {args.explorer_range}")
+                else:
+                    logger.error(f"WORKFLOW CONFIG: No s'ha pogut posar el rang {args.explorer_range}")
 
         # Iniciar Workflow
         logger.info("WORKFLOW: Iniciant seqüència automàtica...")

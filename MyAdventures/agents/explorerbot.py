@@ -35,6 +35,18 @@ class ExplorerBot(BaseAgent):
         self.log.info(f"Rang d'exploració canviat a: {new_range}")
         return new_range
 
+    def set_range(self, range_val): # Ho utilitzem per canviar el rang al fer un workflow que hereda del base
+        """Estableix un rang d'exploració específic."""
+        try:
+            val = int(range_val)
+            self.exploration_ranges = [val]
+            self.current_range_index = 0
+            self.log.info(f"Rang d'exploració configurat manualment a: {val}")
+            return True
+        except ValueError:
+            self.log.error(f"Error al configurar rang: {range_val} no és un enter vàlid.")
+            return False
+
     def on_message(self, message):
         """Gestiona missatges rebuts pel bus."""
         msg_type = message.get("type")

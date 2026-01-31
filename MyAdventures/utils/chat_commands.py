@@ -308,6 +308,14 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
             plan_name = builder.current_plan_name
             cmd_args.extend(["--builder-plan", plan_name])
             _safe_post(f" -> Heretant pla construcció: {plan_name}")
+
+        # Rang de l'ExplorerBot
+        explorer = agents_dict.get("ExplorerBot")
+        if explorer:
+            # Obtenim el rang actual directament de les propietats de l'agent
+            current_range = explorer.exploration_ranges[explorer.current_range_index]
+            cmd_args.extend(["--explorer-range", str(current_range)])
+            _safe_post(f" -> Heretant rang exploració: {current_range}")
             
         _safe_post("=" * 40)
 
