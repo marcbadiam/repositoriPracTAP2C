@@ -58,6 +58,14 @@ class MinerBot(BaseAgent):
         next_index = (self.current_strategy_index + 1) % len(self.strategies)
         return self.set_strategy(next_index)
 
+    def switch_strategy_by_name(self, name: str) -> bool:
+        """Canvia l'estratègia buscant-la pel nom de la classe."""
+        for i, strategy in enumerate(self.strategies):
+            if strategy.__class__.__name__ == name:
+                return self.set_strategy(i)
+        self.log.warning(f"Estratègia no trobada: {name}")
+        return False, None
+
     def _release_locks(self):
         """Allibera bloquejos espacials (anchor_pos)."""
         if self.anchor_pos:
@@ -87,22 +95,22 @@ class MinerBot(BaseAgent):
             self.reset()
 
     def _handle_requirements(self, msg):
-        self.requirements = msg.get("payload", {}).get("needs")
-        self.log.info(f"Requeriments de materials rebuts: {self.requirements}")
-        # Inicialitzar l'inventari per a nous requeriments si no existeix, pero no esborrar stock existent
-        for req in self.requirements:
-            if req not in self.inventory:
-                self.inventory[req] = 0
+        with self.state_lock:
+            self.requirements = msg.get("payload", {}).get("needs")
+            self.log.info(f"Requeriments de materials rebuts: {self.requirements}")
+            for req in self.requirements:
+                if req not in self.inventory:
+                    self.inventory[req] = 0
 
-        # Comprova el flag del workflow
-        if self.system_flags.get("workflow_mode", False):
-            self.start()
-        else:
-            self.set_state(
-                AgentState.WAITING,
-                "Requeriments rebuts (Manual). Esperant comanda -miner start.",
-            )
-            self.log.info("Mode Manual: No s'inicia la mineria automàticament.")
+            # Comprova el flag del workflow
+            if self.system_flags.get("workflow_mode", False):
+                self.start()
+            else:
+                self.set_state(
+                    AgentState.WAITING,
+                    "Requeriments rebuts (Manual). Esperant comanda -miner start.",
+                )
+                self.log.info("Mode Manual: No s'inicia la mineria automàticament.")
 
     def perceive(self):
         """Percepció"""
@@ -117,14 +125,15 @@ class MinerBot(BaseAgent):
         if self.state != AgentState.RUNNING:
             return
 
-        if not self.anchor_pos:
-            self._set_anchor_pos()
+        with self.state_lock:
+            if not self.anchor_pos:
+                self._set_anchor_pos()
 
-        if self._check_requirements_fulfilled():
-            self._finalize_mining()
-            return
+            if self._check_requirements_fulfilled():
+                self._finalize_mining()
+                return
 
-        self._mine_resources()
+            self._mine_resources()
 
     def _set_anchor_pos(self):
         """Estableix la posició anchor_pos per a la mineria."""
@@ -240,13 +249,14 @@ class MinerBot(BaseAgent):
 
     def _publish_inventory(self, final=False):
         """Publica l'estat actual de l'inventari."""
-        payload = {"inventory": self.inventory.copy()}
-        if final:
-            # En el missatge final, enviem només el que es necessita
-            payload["inventory"] = {
-                k: min(self.inventory.get(k, 0), v)
-                for k, v in self.requirements.items()
-            }
+        with self.state_lock:
+            payload = {"inventory": self.inventory.copy()}
+            if final:
+                # En el missatge final, enviem només el que es necessita
+                payload["inventory"] = {
+                    k: min(self.inventory.get(k, 0), v)
+                    for k, v in self.requirements.items()
+                }
 
         inv_msg = MessageProtocol.create_message(
             "inventory.v1", self.name, "BuilderBot", payload
@@ -285,13 +295,15 @@ class MinerBot(BaseAgent):
     def reset(self):
         """Reseteja l'estat del MinerBot."""
         self.log.info("Resetejant MinerBot...")
-        self.inventory = {}
-        self.requirements = None
-        self.anchor_pos = None
+        
+        with self.state_lock:
+            self.inventory = {}
+            self.requirements = None
+            self.anchor_pos = None
 
-        # Reset strategies
-        if self.strategies:
-            for strategy in self.strategies:
-                strategy.reset()
+            # Reset estrategies
+            if self.strategies:
+                for strategy in self.strategies:
+                    strategy.reset()
 
         self.set_state(AgentState.IDLE, "Resetejat per a nou workflow")

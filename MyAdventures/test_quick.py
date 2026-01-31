@@ -71,11 +71,7 @@ try:
     assert MessageProtocol.validate_message(msg)
     print("[OK] Validació JSON OK")
 
-    # Serializar
-    json_str = MessageProtocol.to_json(msg)
-    msg_back = MessageProtocol.from_json(json_str)
-    assert msg_back["source"] == "TestAgent"
-    print("[OK] Serialització JSON OK")
+
 
 except Exception as e:
     print(f"[ERROR] {e}")

@@ -123,7 +123,8 @@ class ExplorerBot(BaseAgent):
                         break
 
                 if found_zone:
-                    self.terrain_map = {"flat_zones": [found_zone]}
+                    with self.state_lock:
+                        self.terrain_map = {"flat_zones": [found_zone]}
                     self.log.debug(f"Terreny percebut: {self.terrain_map}")
                 else:
                     msg = "No s'ha trobat cap zona plana en les direccions explorades."
@@ -144,17 +145,21 @@ class ExplorerBot(BaseAgent):
         if self.state != AgentState.RUNNING or self.map_sent:
             return
 
-        if self.terrain_map.get("flat_zones"):
-            # Lògica de decisió: agafem la primera zona trobada
-            self.target_zone = self.terrain_map["flat_zones"][0]
-            self.log.debug(f"Zona objectiu seleccionada: {self.target_zone}")
+        with self.state_lock:
+            if self.terrain_map.get("flat_zones"):
+                # agafem la primera zona trobada
+                self.target_zone = self.terrain_map["flat_zones"][0]
+                self.log.debug(f"Zona plana seleccionada: {self.target_zone}")
 
     def act(self):
         """Marca la zona i publica el mapa."""
-        if self.state != AgentState.RUNNING or not self.target_zone or self.map_sent:
+        if self.state != AgentState.RUNNING:
             return
 
-        x, z, y = self.target_zone
+        with self.state_lock:
+            if not self.target_zone or self.map_sent:
+                return
+            x, z, y = self.target_zone
 
         if self.mc_lock:
             self.mc_lock.acquire()
@@ -165,16 +170,18 @@ class ExplorerBot(BaseAgent):
                 self.mc_lock.release()
 
         # Crea i publica el missatge amb les coordenades del mapa
-        msg = MessageProtocol.create_message(
-            msg_type="map.v1",
-            source=self.name,
-            target="BuilderBot",
-            payload={"zone": {"x": x, "y": y, "z": z}},
-            context={"state": self.state.name},
-        )
-        self.message_bus.publish(msg)
-        self.log.info(f"Mapa publicat per a BuilderBot: {x}, {y}, {z}")
-        self.map_sent = True
+        with self.state_lock:
+            msg = MessageProtocol.create_message(
+                msg_type="map.v1",
+                source=self.name,
+                target="BuilderBot",
+                payload={"zone": {"x": x, "y": y, "z": z}},
+                context={"state": self.state.name},
+            )
+            self.message_bus.publish(msg)
+            self.log.info(f"Mapa publicat per a BuilderBot: {x}, {y}, {z}")
+            self.map_sent = True
+        
         # Un cop publicat, quedem en WAITING
         self.set_state(
             AgentState.WAITING, reason="Mapa publicat, esperant instruccions"
@@ -193,7 +200,8 @@ class ExplorerBot(BaseAgent):
 
     def reset(self):
         """Reseteja l'estat per a un nou workflow."""
-        self.map_sent = False
-        self.target_zone = None
+        with self.state_lock:
+            self.map_sent = False
+            self.target_zone = None
         self.set_state(AgentState.IDLE, reason="Resetejat per a nou workflow")
         self.log.info("ExplorerBot resetejat")

@@ -30,6 +30,7 @@ class BaseAgent(ABC):
         self._thread = None
         self._tick_interval = 0.2
         self.wait_quietly = False
+        self.state_lock = threading.RLock()
 
     def set_state(self, new_state, reason=""):
         """Canvia l'estat de l'agent amb registre de transició."""

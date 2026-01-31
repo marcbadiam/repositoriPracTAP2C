@@ -50,20 +50,21 @@ class BuilderBot(BaseAgent):
 
     def switch_plan(self, plan_name):
         """Canvia el pla de construcció actiu."""
-        if plan_name not in self.plans:
-            self.log.error(f"Pla desconegut: {plan_name}")
-            return False
+        with self.state_lock:
+            if plan_name not in self.plans:
+                self.log.error(f"Pla desconegut: {plan_name}")
+                return False
 
-        self.current_plan_name = plan_name
-        self.current_plan = self.plans[plan_name]
-        self.bom = self.current_plan.bom
+            self.current_plan_name = plan_name
+            self.current_plan = self.plans[plan_name]
+            self.bom = self.current_plan.bom
 
-        for mat in self.bom:
-            if mat not in self.inventory:
-                self.inventory[mat] = 0
+            for mat in self.bom:
+                if mat not in self.inventory:
+                    self.inventory[mat] = 0
 
-        self.log.info(f"Pla canviat a '{plan_name}'. Nous requisits: {self.bom}")
-        return True
+            self.log.info(f"Pla canviat a '{plan_name}'. Nous requisits: {self.bom}")
+            return True
 
     def cycle_plan(self):
         """Rota al següent pla disponible."""
@@ -99,33 +100,35 @@ class BuilderBot(BaseAgent):
             self.reset()
 
     def _handle_map_v1(self, msg):
-        self.target_zone = msg.get("payload", {}).get("zone")
-        self.log.info(f"Nova zona de construcció rebuda: {self.target_zone}")
+        with self.state_lock:
+            self.target_zone = msg.get("payload", {}).get("zone")
+            self.log.info(f"Zona de construcció rebuda: {self.target_zone}")
 
-        # Reseteja l'estat del builder per a la nova tasca
-        self.build_plan = []
-        self.build_index = 0
+            # Reseteja l'estat del builder per a la nova tasca
+            self.build_plan = []
+            self.build_index = 0
 
-        # Comprova el flag del workflow
-        if self.system_flags.get("workflow_mode", False):
-            self.set_state(
-                AgentState.WAITING, "Zona rebuda, esperant materials (Workflow)"
-            )
-            self._request_materials()
-        else:
-            self.set_state(
-                AgentState.WAITING,
-                "Zona rebuda (Manual). Esperant comanda -builder build.",
-            )
-            self.log.info("Mode Manual: No es demanen materials automàticament.")
+            # Comprova el flag del workflow
+            if self.system_flags.get("workflow_mode", False):
+                self.set_state(
+                    AgentState.WAITING, "Zona rebuda, esperant materials (Workflow)"
+                )
+                self._request_materials()
+            else:
+                self.set_state(
+                    AgentState.WAITING,
+                    "Zona rebuda (Manual). Esperant comanda -builder build.",
+                )
+                self.log.info("Mode Manual: No es demanen materials automàticament.")
 
     def _handle_inventory_v1(self, msg):
-        received_inventory = msg.get("payload", {}).get("inventory", {})
+        with self.state_lock:
+            received_inventory = msg.get("payload", {}).get("inventory", {})
 
-        for k, v in received_inventory.items():
-            self.inventory[k] = v
-        self.log.info(f"Inventari actualitzat: {self.inventory}")
-        self._check_readiness()
+            for k, v in received_inventory.items():
+                self.inventory[k] = v
+            self.log.info(f"Inventari actualitzat: {self.inventory}")
+            self._check_readiness()
 
     def _request_materials(self):
         """Envia una petició de materials al MinerBot."""
@@ -176,13 +179,14 @@ class BuilderBot(BaseAgent):
         if self.state != AgentState.RUNNING:
             return
 
-        if not self.build_plan:
-            self._create_build_plan()
+        with self.state_lock:
+            if not self.build_plan:
+                self._create_build_plan()
 
-        if self.build_index < len(self.build_plan):
-            self._build_next_block()
-        else:
-            self._finalize_build()
+            if self.build_index < len(self.build_plan):
+                self._build_next_block()
+            else:
+                self._finalize_build()
 
     def _create_build_plan(self):
         """Crea el pla de construcció basat en el pla seleccionat."""
@@ -267,15 +271,17 @@ class BuilderBot(BaseAgent):
     def reset(self):
         """Reseteja l'estat del BuilderBot per a un nou workflow."""
         self.log.info("Resetejant BuilderBot...")
-        self.log.info("Resetejant BuilderBot...")
-        if self.current_plan:
-            self.bom = self.current_plan.bom
-            self.inventory = {k: 0 for k in self.bom}
-        else:
-            self.inventory = {}
-        self.target_zone = None
-        self.build_plan = []
-        self.build_index = 0
+        
+        with self.state_lock:
+            if self.current_plan:
+                self.bom = self.current_plan.bom
+                self.inventory = {k: 0 for k in self.bom}
+            else:
+                self.inventory = {}
+            self.target_zone = None
+            self.build_plan = []
+            self.build_index = 0
+            
         self.set_state(AgentState.IDLE, "Resetejat per a nou workflow")
 
     def start(self):

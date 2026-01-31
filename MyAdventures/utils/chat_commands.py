@@ -281,54 +281,43 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
 
     handler.register("miner switch", miner_switch)
 
-    # Workflow command - MAIN ENTRY POINT
+    # Workflow command - genera un nou procés
     def workflow_run(args):
-        """Executa el flux complet: Explorer -> Builder -> Miner -> Build"""
-        explorer = agents_dict.get("ExplorerBot")
-
-        if not explorer:
-            _safe_post("[Workflow] Error: ExplorerBot no trobat")
-            return
+        """Executa el flux complet en un NOU PROCÉS: Explorer -> Builder -> Miner -> Build"""
+        import subprocess
+        import sys
 
         _safe_post("")
         _safe_post("=" * 40)
-        _safe_post("[Workflow] INICIANT FLUX COMPLET (NOVA SESSIO)")
+        _safe_post("[Workflow] PREPARANT NOU PROCÉS DE TREBALL...")
+        
+        # Obtenir configuració actual del procès base
+        cmd_args = [sys.executable, "run.py", "--workflow"]
+        
+        # Estratègia del MinerBot
+        miner = agents_dict.get("MinerBot")
+        if miner and miner.strategies:
+            current_strat = miner.strategies[miner.current_strategy_index]
+            strat_name = current_strat.__class__.__name__
+            cmd_args.extend(["--miner-strategy", strat_name])
+            _safe_post(f" -> Heretant estratègia mineria: {strat_name}")
+            
+        # Pla    del BuilderBot
+        builder = agents_dict.get("BuilderBot")
+        if builder and builder.current_plan_name:
+            plan_name = builder.current_plan_name
+            cmd_args.extend(["--builder-plan", plan_name])
+            _safe_post(f" -> Heretant pla construcció: {plan_name}")
+            
         _safe_post("=" * 40)
 
-        # Aturar tot el que hi hagi abans
-        stop_all_active_agents()
-
-        # Activar flag workflow
-        if system_flags is not None:
-            system_flags["workflow_mode"] = True
-            logger.info("WORKFLOW MODE: ACTIVAT")
-
-        # Potser no cal fer el reset des el bus?
-        if explorer and hasattr(explorer, "message_bus"):
-            from utils.communication import MessageProtocol
-
-            rst_msg = MessageProtocol.create_message(
-                "workflow.reset", "User", "all", {}
-            )
-            explorer.message_bus.publish(rst_msg)
-
-        import time
-
-        time.sleep(0.5)
-
-        for name, agent in agents_dict.items():
-            # Assegurar sempre que el thread s'està executant independentment de l'estat
-            if not agent._thread or not agent._thread.is_alive():
-                logger.info(f"Reiniciant fil d'execució per a {name}")
-                agent.start_loop()
-
-            # Si estava STOPPED manualment, el tornem a IDLE
-            if agent.state == AgentState.STOPPED:
-                agent.set_state(AgentState.IDLE, reason="Workflow restart")
-
-        # Iniciar Explorer (que iniciarà la cadena)
-        _safe_post("Iniciant ExplorerBot per començar la cadena...")
-        explorer.handle_command("start", {})
+        try:
+            # llançar el procés de forma independent (sense esperar que acabi)
+            subprocess.Popen(cmd_args)
+            _safe_post("[Workflow] NOU PROCÉS INICIAT CORRECTAMENT.")
+        except Exception as e:
+            logger.error(f"Error llançant subprocess: {e}")
+            _safe_post(f"[Workflow] ERROR: No s'ha pogut iniciar el procés: {e}")
 
     handler.register("workflow run", workflow_run)
 
