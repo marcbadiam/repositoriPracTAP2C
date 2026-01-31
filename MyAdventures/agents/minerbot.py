@@ -192,10 +192,6 @@ class MinerBot(BaseAgent):
 
         if strategy.is_stopped:
             self.log.info("Estratègia parada. Parant MinerBot.")
-            if self.mc:
-                self.mc.postToChat(
-                    f"[{self.name}] Estratègia parada a Y=6. Finalitzant workflow."
-                )
             self.stop()
             return
 
