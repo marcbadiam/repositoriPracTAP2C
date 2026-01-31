@@ -29,10 +29,20 @@ def main():
     """Inicialitza el sistema i manté un bucle esperant comandes."""
 
     parser = argparse.ArgumentParser(description="Sistema Multi-Agent per Minecraft")
-    parser.add_argument("--workflow", action="store_true", help="Executa en mode workflow automàtic (subprocess)")
-    parser.add_argument("--miner-strategy", type=str, help="Nom de l'estratègia de mineria a utilitzar")
-    parser.add_argument("--builder-plan", type=str, help="Nom del pla de construcció a utilitzar")
-    parser.add_argument("--explorer-range", type=int, help="Rang d'exploració per a ExplorerBot")
+    parser.add_argument(
+        "--workflow",
+        action="store_true",
+        help="Executa en mode workflow automàtic (subprocess)",
+    )
+    parser.add_argument(
+        "--miner-strategy", type=str, help="Nom de l'estratègia de mineria a utilitzar"
+    )
+    parser.add_argument(
+        "--builder-plan", type=str, help="Nom del pla de construcció a utilitzar"
+    )
+    parser.add_argument(
+        "--explorer-range", type=int, help="Rang d'exploració per a ExplorerBot"
+    )
     args = parser.parse_args()
 
     setup_logging()
@@ -85,9 +95,13 @@ def main():
             miner = agents_dict.get("MinerBot")
             if miner:
                 if miner.switch_strategy_by_name(args.miner_strategy):
-                    logger.info(f"WORKFLOW CONFIG: MinerBot estrategia: {args.miner_strategy}")
+                    logger.info(
+                        f"WORKFLOW CONFIG: MinerBot estrategia: {args.miner_strategy}"
+                    )
                 else:
-                    logger.error(f"WORKFLOW CONFIG: No s'ha pogut posar l'estratègia {args.miner_strategy}")
+                    logger.error(
+                        f"WORKFLOW CONFIG: No s'ha pogut posar l'estratègia {args.miner_strategy}"
+                    )
 
         # Configurar Builder
         if args.builder_plan:
@@ -96,25 +110,32 @@ def main():
                 if builder.switch_plan(args.builder_plan):
                     logger.info(f"WORKFLOW CONFIG: BuilderBot pla: {args.builder_plan}")
                 else:
-                    logger.error(f"WORKFLOW CONFIG: No s'ha pogut posar el pla {args.builder_plan}")
+                    logger.error(
+                        f"WORKFLOW CONFIG: No s'ha pogut posar el pla {args.builder_plan}"
+                    )
 
         # Configurar Explorer
         if args.explorer_range:
             explorer_agent = agents_dict.get("ExplorerBot")
             if explorer_agent:
                 if explorer_agent.set_range(args.explorer_range):
-                    logger.info(f"WORKFLOW CONFIG: ExplorerBot rang: {args.explorer_range}")
+                    logger.info(
+                        f"WORKFLOW CONFIG: ExplorerBot rang: {args.explorer_range}"
+                    )
                 else:
-                    logger.error(f"WORKFLOW CONFIG: No s'ha pogut posar el rang {args.explorer_range}")
+                    logger.error(
+                        f"WORKFLOW CONFIG: No s'ha pogut posar el rang {args.explorer_range}"
+                    )
 
         # Iniciar Workflow
         logger.info("WORKFLOW: Iniciant seqüència automàtica...")
         explorer = agents_dict.get("ExplorerBot")
         # reset per netejar tot
         from utils.communication import MessageProtocol
+
         rst_msg = MessageProtocol.create_message("workflow.reset", "System", "all", {})
         bus.publish(rst_msg)
-        
+
         time.sleep(1)
 
         # Iniciar Explorer
@@ -123,7 +144,7 @@ def main():
 
     # Configurar Gestor de Comandes (en workflow no escoltem xat)
     cmd_handler = create_default_handlers(agents_dict, mc, mc_lock, system_flags)
-    
+
     if not args.workflow:
         logger.info("[OK] Sistema de comandes de xat inicialitzat")
         safe_mc_post(
@@ -131,7 +152,6 @@ def main():
             mc_lock,
             "Sistema Multi-Agent iniciat! Escriu '-workflow run' o '-explorer start' per començar.",
         )
-
 
     # Bucle Principal
     last_check = time.time()
@@ -143,11 +163,16 @@ def main():
             if args.workflow:
                 builder = agents_dict.get("BuilderBot")
                 # Comprovar si s'ha completat la construcció (tots els blocs colocats)
-                if builder and builder.inventory and builder.build_plan and builder.build_index >= len(builder.build_plan):
-                     logger.info("WORKFLOW: Construcció completada. Tancant procés...")
-                     time.sleep(2) # Donar temps a logs finals
-                     break
-                
+                if (
+                    builder
+                    and builder.inventory
+                    and builder.build_plan
+                    and builder.build_index >= len(builder.build_plan)
+                ):
+                    logger.info("WORKFLOW: Construcció completada. Tancant procés...")
+                    time.sleep(2)  # Donar temps a logs finals
+                    break
+
                 time.sleep(1)
                 continue
 
@@ -185,7 +210,7 @@ def main():
                 agent.stop_loop()
             except:
                 pass
-        
+
         if not args.workflow:
             safe_mc_post(mc, mc_lock, "Sistema Multi-Agent parat")
 

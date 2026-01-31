@@ -290,10 +290,10 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
         _safe_post("")
         _safe_post("=" * 40)
         _safe_post("[Workflow] PREPARANT NOU PROCÉS DE TREBALL...")
-        
+
         # Obtenir configuració actual del procès base
         cmd_args = [sys.executable, "run.py", "--workflow"]
-        
+
         # Estratègia del MinerBot
         miner = agents_dict.get("MinerBot")
         if miner and miner.strategies:
@@ -301,7 +301,7 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
             strat_name = current_strat.__class__.__name__
             cmd_args.extend(["--miner-strategy", strat_name])
             _safe_post(f" -> Heretant estratègia mineria: {strat_name}")
-            
+
         # Pla    del BuilderBot
         builder = agents_dict.get("BuilderBot")
         if builder and builder.current_plan_name:
@@ -316,7 +316,7 @@ def create_default_handlers(agents_dict, mc, mc_lock=None, system_flags=None):
             current_range = explorer.exploration_ranges[explorer.current_range_index]
             cmd_args.extend(["--explorer-range", str(current_range)])
             _safe_post(f" -> Heretant rang exploració: {current_range}")
-            
+
         _safe_post("=" * 40)
 
         try:

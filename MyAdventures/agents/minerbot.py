@@ -291,7 +291,7 @@ class MinerBot(BaseAgent):
     def reset(self):
         """Reseteja l'estat del MinerBot."""
         self.log.info("Resetejant MinerBot...")
-        
+
         with self.state_lock:
             self.inventory = {}
             self.requirements = None

@@ -271,7 +271,7 @@ class BuilderBot(BaseAgent):
     def reset(self):
         """Reseteja l'estat del BuilderBot per a un nou workflow."""
         self.log.info("Resetejant BuilderBot...")
-        
+
         with self.state_lock:
             if self.current_plan:
                 self.bom = self.current_plan.bom
@@ -281,7 +281,7 @@ class BuilderBot(BaseAgent):
             self.target_zone = None
             self.build_plan = []
             self.build_index = 0
-            
+
         self.set_state(AgentState.IDLE, "Resetejat per a nou workflow")
 
     def start(self):

@@ -65,8 +65,6 @@ class MessageProtocol:
         return all(k in msg for k in required)
 
 
-
-
 class MessageBus:
     """
     Bus de missatges asíncron (Producer-Consumer) amb cues i validació
@@ -82,19 +80,17 @@ class MessageBus:
         """
         import queue
         import threading
-        
+
         self.subscribers = []
         self.log = logging.getLogger("MessageBus")
-        
+
         # Cua thread-safe per a comunicació asíncrona
         self.queue = queue.Queue()
         self.running = True
-        
+
         # Thread worker que processa els missatges
         self._worker_thread = threading.Thread(
-            target=self._process_queue, 
-            name="MessageBus-Worker", 
-            daemon=True
+            target=self._process_queue, name="MessageBus-Worker", daemon=True
         )
         self._worker_thread.start()
         self.log.info("Bus de missatges asíncron iniciat.")
@@ -113,7 +109,7 @@ class MessageBus:
     def publish(self, msg: dict):
         """
         Envia un missatge a la cua de processament (no bloquejant).
-        
+
         Realitza validació i garanteix traçabilitat abans d'encuar.
         L'emissor recupera el control immediatament després d'encuar (asíncron).
 
@@ -121,8 +117,8 @@ class MessageBus:
             msg (dict): Missatge a enviar.
         """
         import uuid
-        
-        # validacio de format    
+
+        # validacio de format
         if not MessageProtocol.validate_message(msg):
             self.log.error(f"MessageBus REBUTJAT: Format invàlid: {msg}")
             return
@@ -133,7 +129,7 @@ class MessageBus:
 
         # encuar asíncron
         self.queue.put(msg)
-        
+
         msg_type = msg.get("type", "unknown")
         # self.log.debug(
 
@@ -145,16 +141,16 @@ class MessageBus:
             try:
                 # bloqueja fins que hi ha un missatge
                 msg = self.queue.get(timeout=1.0)
-                
+
                 # log de processament
                 # self.log.debug(
-                
+
                 # broadcast a tots els subscriptors
                 for callback in self.subscribers:
                     self._deliver_with_retry(callback, msg)
-                
+
                 self.queue.task_done()
-                
+
             except Exception:
                 # timeout de la cua (normal) o error inesperat
                 continue
