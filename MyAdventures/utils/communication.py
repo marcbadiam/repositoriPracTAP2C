@@ -1,5 +1,4 @@
 # Comunicació asíncrona basada en missatges JSON
-import json
 import logging
 from datetime import datetime, timezone
 
@@ -129,9 +128,6 @@ class MessageBus:
 
         # encuar asíncron
         self.queue.put(msg)
-
-        msg_type = msg.get("type", "unknown")
-        # self.log.debug(
 
     def _process_queue(self):
         """

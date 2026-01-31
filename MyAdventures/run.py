@@ -7,7 +7,6 @@ import time
 import logging
 import threading
 import argparse
-import sys
 from utils.communication import MessageBus
 from utils.discovery import discover_agents
 from utils.logging_config import setup_logging
@@ -205,11 +204,8 @@ def main():
     finally:
         # neteja final
         for name, agent in agents_dict.items():
-            try:
-                agent.stop()
-                agent.stop_loop()
-            except:
-                pass
+            agent.stop()
+            agent.stop_loop()
 
         if not args.workflow:
             safe_mc_post(mc, mc_lock, "Sistema Multi-Agent parat")
