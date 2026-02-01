@@ -2,6 +2,7 @@
 from .strategy_base import MiningStrategy
 from typing import Dict, Tuple
 import logging
+from mcpi import block as mcblock
 
 logger = logging.getLogger(__name__)
 
@@ -10,6 +11,24 @@ class VerticalSearchStrategy(MiningStrategy):
     """
     Des del punt d'anchor, mina verticalment cap avall fins a la profunditat màxima.
     """
+
+    ID_TO_NAME = {
+        mcblock.STONE.id: "stone",
+        mcblock.DIRT.id: "dirt",
+        mcblock.GRASS.id: "grass",
+        mcblock.SAND.id: "sand",
+        mcblock.GRAVEL.id: "gravel",
+        mcblock.WOOD.id: "wood",
+        mcblock.WOOD_PLANKS.id: "wood_planks",
+        mcblock.COAL_ORE.id: "coal_ore",
+        mcblock.IRON_ORE.id: "iron_ore",
+        mcblock.GOLD_ORE.id: "gold_ore",
+        mcblock.DIAMOND_ORE.id: "diamond_ore",
+        mcblock.REDSTONE_ORE.id: "redstone_ore",
+        mcblock.LAPIS_LAZULI_ORE.id: "lapis_ore",
+        mcblock.COBBLESTONE.id: "cobblestone",
+        mcblock.SANDSTONE.id: "sandstone",
+    }
 
     def __init__(self):
         """
@@ -57,27 +76,9 @@ class VerticalSearchStrategy(MiningStrategy):
 
         # Perforar cap avall des de la posició inicial
         current_y = start_y
-        block_types = [
-            "stone",
-            "dirt",
-            "grass",
-            "sand",
-            "gravel",
-            "wood",
-            "wood_planks",
-            "coal_ore",
-            "iron_ore",
-            "gold_ore",
-            "diamond_ore",
-            "redstone_ore",
-            "lapis_ore",
-            "cobblestone",
-            "sandstone",
-        ]
 
         # El bucle s'atura si arribem a Y=6 (definit dins del bucle)
-        # Posem un límit de seguretat de -64 (bedrock) per si de cas
-        while current_y >= -64:
+        while current_y >= 2:
             if current_y == 6:
                 logger.info("Y=6. Aturant cerca vertical i workflow.")
                 self.is_stopped = True
@@ -93,40 +94,66 @@ class VerticalSearchStrategy(MiningStrategy):
             self.current_depth = current_y
             self.current_position = (start_x, current_y, start_z)
 
-            # Minar blocs a la profunditat actual
-            for block_type in block_types:
-                if self.is_stopped:
-                    break
+            if mc:
+                block_id = 0
+                try:
+                    if mc_lock:
+                        mc_lock.acquire()
+                    try:
+                        block_id = mc.getBlock(start_x, current_y, start_z)
+                    finally:
+                        if mc_lock:
+                            mc_lock.release()
+                except Exception as e:
+                    logger.error(f"Error obtenint bloc a {self.current_position}: {e}")
+                    block_id = 0
 
-                materials = self.mine_block(
-                    mc,
-                    self.current_position,
-                    block_type,
-                    working_inventory,
-                    requirements,
-                    mc_lock,
-                )
+                if block_id != 0:
+                    try:
+                        if mc_lock:
+                            mc_lock.acquire()
+                        try:
+                            mc.setBlock(start_x, current_y, start_z, 0)  # Posar a AIR
+                            self.blocks_mined += 1
+                        finally:
+                            if mc_lock:
+                                mc_lock.release()
+                    except Exception as e:
+                        logger.error(
+                            f"Error minant bloc a {self.current_position}: {e}"
+                        )
 
-                # Filtrar materials útils
-                useful_materials = {}
-                if requirements:
-                    for mat, qty in materials.items():
-                        needed = requirements.get(mat, 0)
-                        current = working_inventory.get(mat, 0)
-                        if current < needed:
-                            useful_materials[mat] = qty
-                else:
-                    useful_materials = materials
+                    # Identificar i recollir si és útil
+                    block_name = self.ID_TO_NAME.get(block_id)
 
-                collected_materials = self._merge_materials(
-                    collected_materials, useful_materials
-                )
-                working_inventory = self.update_inventory(
-                    working_inventory, useful_materials
-                )
+                    if block_name:
+                        materials_yield = self.BLOCK_YIELDS.get(block_name, {}).copy()
+
+                        # Filtrar si és necessari segons requeriments
+                        useful_materials = {}
+                        if requirements:
+                            for mat, qty in materials_yield.items():
+                                needed = requirements.get(mat, 0)
+                                current = working_inventory.get(mat, 0)
+                                # Si el necessitem (encara no tenim prous), el recollim
+                                if current < needed:
+                                    useful_materials[mat] = qty
+                        else:
+                            useful_materials = materials_yield
+
+                        # Actualitzar inventory i materials recollits
+                        if useful_materials:
+                            collected_materials = self._merge_materials(
+                                collected_materials, useful_materials
+                            )
+                            working_inventory = self.update_inventory(
+                                working_inventory, useful_materials
+                            )
+                            logger.debug(
+                                f"Profunditat {current_y}: Recollit {useful_materials} de {block_name}"
+                            )
 
             self.materials_collected = collected_materials.copy()
-            logger.debug(f"Profunditat {current_y}: col·lectat {collected_materials}")
 
             if requirements and self.validate_requirements(
                 working_inventory, requirements
@@ -134,7 +161,6 @@ class VerticalSearchStrategy(MiningStrategy):
                 logger.info("Requeriments assolits, aturant cerca vertical")
                 return collected_materials
 
-            # Moure's al següent nivell de profunditat
             current_y -= 1
 
         logger.info(f"Cerca vertical completada. Blocs minats: {self.blocks_mined}")
