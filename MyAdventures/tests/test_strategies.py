@@ -21,7 +21,15 @@ class TestMiningStrategies(unittest.TestCase):
     def test_vertical_search_returns_materials(self):
         """Prova que VerticalSearchStrategy retorna els tipus de materials esperats."""
         strategy = VerticalSearchStrategy()
-        result = strategy.mine(start_pos=(0, 0, 0))
+
+        class MockMC:
+            def getBlock(self, *args):
+                return 1  # Stone
+
+            def setBlock(self, *args):
+                pass
+
+        result = strategy.mine(mc=MockMC(), start_pos=(0, 10, 0))
 
         self.assertIsInstance(result, dict)
         # self.assertIn('iron', result)
