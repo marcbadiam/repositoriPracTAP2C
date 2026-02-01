@@ -30,7 +30,7 @@ class MiningStrategy(ABC):
         "redstone_ore": {"redstone_ore": 1},
         "lapis_ore": {"lapis_ore": 1},
         "cobblestone": {"cobblestone": 1},
-        "sandstone": {"sandstone": 1}
+        "sandstone": {"sandstone": 1},
     }
 
     def __init__(self):

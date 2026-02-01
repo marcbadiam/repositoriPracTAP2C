@@ -57,7 +57,23 @@ class VerticalSearchStrategy(MiningStrategy):
 
         # Perforar cap avall des de la posició inicial
         current_y = start_y
-        block_types = ["stone", "dirt", "sand", "sandstone"]
+        block_types = [
+            "stone",
+            "dirt",
+            "grass",
+            "sand",
+            "gravel",
+            "wood",
+            "wood_planks",
+            "coal_ore",
+            "iron_ore",
+            "gold_ore",
+            "diamond_ore",
+            "redstone_ore",
+            "lapis_ore",
+            "cobblestone",
+            "sandstone",
+        ]
 
         # El bucle s'atura si arribem a Y=6 (definit dins del bucle)
         # Posem un límit de seguretat de -64 (bedrock) per si de cas
