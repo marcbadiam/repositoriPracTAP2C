@@ -18,8 +18,19 @@ class MiningStrategy(ABC):
     BLOCK_YIELDS = {
         "stone": {"stone": 1},
         "dirt": {"dirt": 1},
+        "grass": {"dirt": 1},
         "sand": {"sand": 1},
-        "sandstone": {"sandstone": 1},
+        "gravel": {"gravel": 1},
+        "wood": {"wood": 1},
+        "wood_planks": {"wood_planks": 1},
+        "coal_ore": {"coal_ore": 1},
+        "iron_ore": {"iron_ore": 1},
+        "gold_ore": {"gold_ore": 1},
+        "diamond_ore": {"diamond_ore": 1},
+        "redstone_ore": {"redstone_ore": 1},
+        "lapis_ore": {"lapis_ore": 1},
+        "cobblestone": {"cobblestone": 1},
+        "sandstone": {"sandstone": 1}
     }
 
     def __init__(self):
